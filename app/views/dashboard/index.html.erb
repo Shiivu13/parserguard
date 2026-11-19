@@ -1,33 +1,62 @@
-<% content_for :title, "Overview" %>
+<%= page_head "Overview", "Layout drift and parser health across watched search pages." %>
 
 <section class="stats">
-  <div class="stat"><span class="stat-label">Targets</span><span class="stat-value"><%= @targets.size %></span></div>
-  <div class="stat"><span class="stat-label">Contracts</span><span class="stat-value"><%= @contracts.size %></span></div>
-  <div class="stat <%= 'stat-alert' if @open_events.positive? %>">
-    <span class="stat-label">Open major/broken drift</span><span class="stat-value"><%= @open_events %></span>
-  </div>
-  <div class="stat"><span class="stat-label">Pending suggestions</span>
-    <span class="stat-value"><%= link_to @pending_suggestions, suggestions_path %></span></div>
+  <div class="stat"><span class="stat-label">Watched targets</span><span class="stat-value"><%= @targets.size %></span></div>
+  <div class="stat"><span class="stat-label">Parser contracts</span><span class="stat-value"><%= @contracts.size %></span></div>
+  <%= link_to drift_events_path, class: [ "stat", ("stat-bad" if @open_events.positive?) ] do %>
+    <span class="stat-label">Open major / broken drift</span><span class="stat-value"><%= @open_events %></span>
+  <% end %>
+  <%= link_to suggestions_path, class: "stat" do %>
+    <span class="stat-label">Suggestions to review</span><span class="stat-value"><%= pending_suggestions_count %></span>
+  <% end %>
 </section>
+
+<% if @review_queue.any? %>
+  <h2>Needs review</h2>
+  <div class="panel">
+    <ul class="queue">
+      <% @review_queue.each do |s| top = s.top_candidate %>
+        <li>
+          <div class="grow">
+            <strong><%= @queue_contracts[s.contract_id]&.key %>#<%= s.field_name %></strong>
+            <div class="muted">
+              <%= selector(s.old_selector, old: true) %> →
+              <%= top ? selector(top["selector"]) : "no candidate found" %>
+            </div>
+          </div>
+          <% if top %><%= metric(top["confidence"]) %><% end %>
+          <%= link_to "Review", suggestion_path(s), class: "btn btn-small" %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
 
 <h2>Engine health</h2>
 <% if @targets.empty? %>
-  <p class="empty">No snapshots yet. Run <code>bin/rails parserguard:ingest_fixtures</code> or POST to <code>/api/v1/snapshots</code>.</p>
+  <p class="empty">No snapshots yet. Run <code>bin/rails parserguard:demo</code> or POST to <code>/api/v1/snapshots</code>.</p>
 <% else %>
   <div class="cards">
-    <% @targets.each do |t| %>
-      <article class="card">
+    <% @targets.each do |t| severity = t.latest_event&.severity || "none" %>
+      <article class="card tone-<%= severity %>">
         <header class="card-head">
           <h3><%= target_label(t.engine, t.locale, t.device) %></h3>
-          <%= severity_badge(t.latest_event&.severity || "none") %>
+          <%= severity_badge(severity) %>
         </header>
-        <dl class="kv">
-          <dt>Snapshots</dt><dd><%= t.snapshot_count %></dd>
-          <dt>Last capture</dt><dd><%= ago(t.last_captured_at) %></dd>
-          <dt>Baseline</dt><dd><%= t.baseline ? link_to("v#{t.baseline.version}", snapshot_path(t.baseline)) : "—" %></dd>
-          <dt>Latest drift</dt>
-          <dd><%= t.latest_event ? link_to(score(t.latest_event.drift_score), drift_event_path(t.latest_event)) : "—" %></dd>
-        </dl>
+        <div class="card-metric">
+          <div>
+            <span class="stat-label">Latest drift score</span>
+            <div class="stat-value">
+              <%= t.latest_event ? link_to(score(t.latest_event.drift_score), drift_event_path(t.latest_event)) : "—" %>
+            </div>
+          </div>
+          <%= sparkline(t.history) %>
+        </div>
+        <div class="card-foot">
+          <span><%= t.snapshot_count %> snapshots</span>
+          <span>baseline <%= t.baseline ? link_to("v#{t.baseline.version}", snapshot_path(t.baseline)) : "—" %></span>
+          <span>captured <%= ago(t.last_captured_at) %></span>
+        </div>
       </article>
     <% end %>
   </div>
@@ -41,9 +70,9 @@
       <% @contracts.each do |c| run = @latest_runs[c.id] %>
         <tr>
           <td><%= link_to c.key, contract_path(c) %></td>
-          <td>v<%= c.version %></td>
+          <td class="num">v<%= c.version %></td>
           <td><%= run ? ago(run.created_at) : "never" %></td>
-          <td><%= run ? safe_join([ meter(run.extraction_rate), " ", pct(run.extraction_rate) ]) : "—" %></td>
+          <td><%= run ? metric(run.extraction_rate) : "—" %></td>
           <td><%= run ? status_badge(run.status) : "—" %></td>
         </tr>
       <% end %>

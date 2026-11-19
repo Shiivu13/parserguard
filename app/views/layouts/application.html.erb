@@ -6,7 +6,6 @@
     <meta name="color-scheme" content="light dark">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <%= yield :head %>
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
@@ -14,13 +13,18 @@
 
   <body>
     <header class="topbar">
-      <%= link_to "ParserGuard", root_path, class: "brand" %>
+      <%= link_to root_path, class: "brand" do %>
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 6.5v8.2c0 7.3 5 13.4 12 15.3 7-1.9 12-8 12-15.3V6.5L16 2Z" fill="var(--accent)"/><path d="m11 16.2 3.4 3.4L21.5 12" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        ParserGuard
+      <% end %>
       <nav aria-label="Main">
-        <%= link_to "Overview", root_path, class: ("active" if current_page?(root_path)) %>
-        <%= link_to "Drift", drift_events_path, class: ("active" if controller_name == "drift_events") %>
-        <%= link_to "Suggestions", suggestions_path, class: ("active" if controller_name == "suggestions") %>
-        <%= link_to "Contracts", contracts_path, class: ("active" if controller_name == "contracts") %>
-        <%= link_to "Snapshots", snapshots_path, class: ("active" if controller_name == "snapshots") %>
+        <%= nav_link "Overview", root_path, controller: "dashboard" %>
+        <%= nav_link "Drift", drift_events_path, controller: "drift_events" %>
+        <%= nav_link suggestions_path, controller: "suggestions" do %>
+          Suggestions<% if (n = pending_suggestions_count).positive? %><span class="nav-count"><%= n %></span><% end %>
+        <% end %>
+        <%= nav_link "Contracts", contracts_path, controller: "contracts" %>
+        <%= nav_link "Snapshots", snapshots_path, controller: "snapshots" %>
       </nav>
     </header>
 

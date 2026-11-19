@@ -1,21 +1,16 @@
-<% content_for :title, "Suggestion #{@suggestion.field_name}" %>
-
-<div class="title-row">
-  <h1><code><%= @contract.key %>#<%= @suggestion.field_name %></code></h1>
+<%= page_head "#{@contract.key}##{@suggestion.field_name}",
+              "Snapshot #{@snapshot&.label || '—'} · contract v#{@contract.version}" do %>
   <span data-suggestion-status><%= status_badge(@suggestion.status) %></span>
-</div>
-<p class="muted">
-  Snapshot <%= @snapshot ? link_to(@snapshot.label, snapshot_path(@snapshot)) : "—" %> ·
-  contract v<%= @contract.version %> ·
-  <%= link_to "contract", contract_path(@contract) %>
-</p>
+  <%= link_to "Contract", contract_path(@contract), class: "btn" %>
+<% end %>
 
 <div class="split">
   <section class="panel">
-    <h2>Before <span class="muted">(baseline)</span></h2>
-    <p>Selector <code class="old"><%= @suggestion.old_selector %></code></p>
+    <h2>Before</h2>
+    <p>Selector <%= selector(@suggestion.old_selector, old: true) %></p>
     <% field = @suggestion.container? ? @contract.required_fields.first&.name : @suggestion.field_name %>
     <% values = @baseline_run ? @baseline_run.items.filter_map { |i| i[field] }.first(5) : [] %>
+    <p class="muted">What it extracted on the baseline<%= " (#{field})" if @suggestion.container? %>:</p>
     <% if values.any? %>
       <ol class="samples"><% values.each do |v| %><li><%= v %></li><% end %></ol>
     <% else %>
@@ -23,11 +18,10 @@
     <% end %>
   </section>
 
-  <section class="panel">
-    <h2>After <span class="muted">(candidates on new snapshot)</span></h2>
+  <section>
+    <h2 style="margin-top: 0">Candidates on the new snapshot</h2>
     <% if @suggestion.candidates.empty? %>
-      <p class="empty">No selector reached the confidence floor. This page likely needs a manual fix
-        (or it is not a results page at all).</p>
+      <p class="empty">No selector reached the confidence floor. This page probably needs a manual fix, or it is not a results page at all.</p>
     <% else %>
       <div data-controller="accept-suggestion"
            data-accept-suggestion-url-value="<%= accept_suggestion_path(@suggestion, format: :json) %>"
@@ -35,34 +29,35 @@
         <p class="error" data-accept-suggestion-target="error" hidden></p>
         <ol class="candidates">
           <% @suggestion.candidates.each_with_index do |c, i| %>
-            <li class="candidate <%= 'chosen' if c['selector'] == @suggestion.accepted_selector %>"
+            <li class="candidate <%= 'best' if i.zero? %> <%= 'chosen' if c['selector'] == @suggestion.accepted_selector %>"
                 data-accept-suggestion-target="row">
               <div class="candidate-head">
-                <code><%= c["selector"] %></code>
-                <span class="muted"><%= c["kind"] %></span>
-                <span class="conf"><%= meter(c["confidence"]) %> <%= pct(c["confidence"]) %></span>
+                <%= selector(c["selector"]) %>
+                <span class="badge badge-plain"><%= c["kind"] %></span>
+                <% if i.zero? %><span class="badge badge-plain">best match</span><% end %>
+                <span class="conf"><%= pct(c["confidence"]) %></span>
               </div>
-              <dl class="kv kv-inline">
-                <dt>coverage</dt><dd><%= pct(c["coverage"]) %></dd>
-                <dt>agreement</dt><dd><%= pct(c["agreement"]) %></dd>
-                <dt>stability</dt><dd><%= pct(c["stability"]) %></dd>
-                <dt>uniqueness</dt><dd><%= pct(c["uniqueness"]) %></dd>
-              </dl>
-              <% if c["samples"].present? %>
-                <p class="sample-line"><%= c["samples"].join(" · ") %></p>
-              <% end %>
-              <% if @suggestion.pending? %>
-                <button type="button" class="btn <%= 'btn-primary' if i.zero? %>"
-                        data-action="accept-suggestion#accept"
-                        data-accept-suggestion-selector-param="<%= c['selector'] %>">Accept</button>
-              <% end %>
+              <div class="candidate-scores">
+                <span>coverage <b><%= pct(c["coverage"]) %></b></span>
+                <span>agreement <b><%= pct(c["agreement"]) %></b></span>
+                <span>stability <b><%= pct(c["stability"]) %></b></span>
+                <span>uniqueness <b><%= pct(c["uniqueness"]) %></b></span>
+              </div>
+              <div class="candidate-foot">
+                <span class="sample-line"><%= c["samples"].to_a.join(" · ") %></span>
+                <% if @suggestion.pending? %>
+                  <button type="button" class="btn btn-small <%= 'btn-primary' if i.zero? %>"
+                          data-action="accept-suggestion#accept"
+                          data-accept-suggestion-selector-param="<%= c['selector'] %>">Accept</button>
+                <% end %>
+              </div>
             </li>
           <% end %>
         </ol>
       </div>
     <% end %>
     <% if @suggestion.pending? %>
-      <%= button_to "Reject all", reject_suggestion_path(@suggestion), class: "btn btn-quiet", form: { data: { reject_form: true } } %>
+      <p><%= button_to "Reject all", reject_suggestion_path(@suggestion), class: "btn btn-quiet btn-small", form: { data: { reject_form: true } } %></p>
     <% end %>
   </section>
 </div>

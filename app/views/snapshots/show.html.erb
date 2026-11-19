@@ -1,21 +1,21 @@
-<% content_for :title, @snapshot.label %>
-
-<div class="title-row">
-  <h1><%= @snapshot.label %> <%= tag.span("baseline", class: "badge badge-none") if @snapshot.baseline %></h1>
-  <% unless @snapshot.baseline %>
+<%= page_head @snapshot.label, @snapshot.query.presence do %>
+  <% if @snapshot.baseline %>
+    <span class="badge badge-plain">baseline</span>
+  <% else %>
     <%= button_to "Make baseline", promote_snapshot_path(@snapshot), class: "btn",
                   form: { data: { turbo_confirm: "Future drift will be measured against this snapshot. Continue?" } } %>
   <% end %>
-</div>
+<% end %>
 
-<dl class="kv">
-  <dt>Query</dt><dd><%= @snapshot.query.presence || "—" %></dd>
-  <dt>Source</dt><dd><%= @snapshot.source %> <span class="muted"><%= @snapshot.source_ref %></span></dd>
-  <dt>Captured</dt><dd><%= ago(@snapshot.captured_at) %></dd>
-  <dt>Size</dt><dd><%= number_to_human_size(@snapshot.byte_size) %></dd>
-  <dt>SHA-256</dt><dd><code class="hash"><%= @snapshot.sha256 %></code></dd>
-  <dt>Drift</dt><dd><%= @event ? link_to("#{@event.severity} (#{score(@event.drift_score)})", drift_event_path(@event)) : "—" %></dd>
-</dl>
+<div class="panel">
+  <dl class="kv">
+    <dt>Source</dt><dd><%= @snapshot.source %> <span class="muted"><%= @snapshot.source_ref %></span></dd>
+    <dt>Captured</dt><dd><%= ago(@snapshot.captured_at) %></dd>
+    <dt>Size</dt><dd><%= number_to_human_size(@snapshot.byte_size) %></dd>
+    <dt>SHA-256</dt><dd><code class="hash"><%= @snapshot.sha256 %></code></dd>
+    <dt>Drift</dt><dd><%= @event ? link_to("#{@event.severity} (#{score(@event.drift_score)})", drift_event_path(@event)) : "—" %></dd>
+  </dl>
+</div>
 
 <h2>Contract runs</h2>
 <% if @runs.empty? %>
@@ -35,6 +35,6 @@
     <button type="button" class="btn btn-quiet btn-small" data-action="preview-toggle#toggle"
             data-preview-toggle-target="button" aria-expanded="false">Show</button>
   </h2>
-  <%# Rendered as escaped text only: captured pages are untrusted. %>
+  <%# Escaped text only: captured pages are untrusted. %>
   <pre class="source" data-preview-toggle-target="panel" hidden><%= @snapshot.html.to_s.first(200_000) %></pre>
 </section>

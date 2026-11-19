@@ -135,7 +135,7 @@ Captured pages and URLs are untrusted input. Measures in place:
 - **Rendering**: everything is escaped and CSP uses script nonces. Slack mrkdwn is escaped.
 - **Auth**: API keys are stored hashed. Dashboard basic auth fails closed outside dev/test.
 
-The full review and fixes are in [docs/QA_REPORT.md](docs/QA_REPORT.md).
+What was found and fixed during hardening: [docs/HARDENING.md](docs/HARDENING.md).
 
 ## Project layout
 
@@ -148,12 +148,11 @@ app/services/healing     text matcher, selector generator, scorer, healer, accep
 app/services/regression  manifest-driven regression runner
 app/jobs                 detect -> heal -> alert pipeline, scheduled ingest
 app/controllers/api/v1   JSON API
-docs/                    plan, algorithms, QA report
+docs/                    plan, algorithms, hardening notes
 ```
 
 ## Known limitations
 
 - Container healing needs at least two matched results; a page with exactly one result yields no container suggestion.
 - Drift histograms cover the whole `<body>`; very dynamic pages may need a narrower scope per engine.
-- Sidekiq has not been run on Windows in this setup (the Memurai install failed). Jobs were exercised with the `async` adapter and in specs.
-- CI workflow is written (`.github/workflows/ci.yml`) but has not run yet; there is no remote.
+- Sidekiq does not support Windows natively. On Windows use `JOB_ADAPTER=async`, or run Sidekiq under WSL or Docker.

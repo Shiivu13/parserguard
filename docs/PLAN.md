@@ -1,12 +1,12 @@
 # Implementation plan
 
-This is the plan written before implementation, by the planner/architect role. It describes the intended architecture. [ALGORITHMS.md](ALGORITHMS.md) describes what actually shipped, including changes made after QA.
+The plan I wrote before starting. [ALGORITHMS.md](ALGORITHMS.md) describes what actually shipped, including changes made during hardening.
 
-## Roles and branches
+## Branches
 
-Work was split by role. Each branch was merged into `main` with `--no-ff` after its specs passed.
+One branch per area, each merged into `main` with `--no-ff` once its specs passed.
 
-| # | Branch | Role | Scope |
+| # | Branch | Area | Scope |
 |---|---|---|---|
 | 1 | `chore/setup` | DevOps | Rails 8 without ActiveRecord; Mongoid, Sidekiq, RSpec/FactoryBot/WebMock/SimpleCov; CI; LF-only fixtures |
 | 2 | `feat/models` | Backend | Snapshot (gzipped HTML, histograms), ParserContract (embedded FieldSpec and revisions), ContractRun, DriftEvent, SelectorSuggestion, ApiKey |
@@ -17,8 +17,8 @@ Work was split by role. Each branch was merged into `main` with `--no-ff` after 
 | 7 | `feat/api` | Backend | JSON API v1, hashed API keys, uniform errors, pagination |
 | 8 | `feat/jobs-alerts` | Backend + DevOps | detect → heal → alert jobs, Slack webhook, scheduled ingest |
 | 9 | `feat/dashboard` | Frontend | Health cards, drift timeline, side-by-side suggestion review, Stimulus accept |
-| 10 | `test/qa-hardening` | QA | Manifest-driven regression runner, extra fixture, security and code review fixes |
-| 11 | `docs/readme` | All | README, algorithms, QA report |
+| 10 | `test/qa-hardening` | Testing | Manifest-driven regression runner, extra fixture, security and correctness fixes |
+| 11 | `docs/readme` | Docs | README, algorithms, hardening notes |
 
 ## Key decisions
 
@@ -35,5 +35,5 @@ Work was split by role. Each branch was merged into `main` with `--no-ff` after 
 | Native gems on Windows | Precompiled nokogiri. `bundle lock --add-platform x86_64-linux` for CI. |
 | Sidekiq on Windows | `JOB_ADAPTER=async` fallback. docker-compose for Redis. |
 | CRLF changing fixture bytes and their sha256 | `.gitattributes` sets `*.html -text` for fixtures and `eol=lf` elsewhere. |
-| Fuzzy matching cost | Sample cap and text-length cap. The QA review later added budgets and banded Levenshtein. |
+| Fuzzy matching cost | Sample cap and text-length cap. Hardening later added budgets and banded Levenshtein. |
 | Healing false positives | Human review, visible sample values, versioned revisions. |

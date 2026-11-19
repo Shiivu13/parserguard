@@ -10,7 +10,7 @@ development:
 test:
   clients:
     default:
-      # One database per test process so parallel runs (CI shards, agents) never truncate each other.
+      # One database per test process so parallel runs (CI shards, multiple terminals) never truncate each other.
       uri: <%= ENV.fetch("MONGODB_TEST_URI", "mongodb://localhost:27017/parser_guard_test_#{ENV.fetch('TEST_ENV_NUMBER', Process.pid)}") %>
       options:
         read:

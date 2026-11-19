@@ -1,7 +1,7 @@
 require "rails_helper"
 
-# Regression tests for the senior QA code review findings.
-RSpec.describe "QA review regressions" do
+# Concurrency, idempotency and data-integrity edge cases across services.
+RSpec.describe "Data integrity" do
   let!(:token) { ApiKey.generate!(name: "spec").last }
   let(:headers) { { "X-Api-Key" => token } }
 

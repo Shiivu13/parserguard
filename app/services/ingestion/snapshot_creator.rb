@@ -5,7 +5,6 @@ module Ingestion
   # - precomputes structure histograms
   # - first snapshot of a target becomes its baseline
   class SnapshotCreator
-    DUPLICATE_KEY = 11_000
     MAX_ATTEMPTS = 3
 
     def self.call(**) = new(**).call
@@ -37,7 +36,7 @@ module Ingestion
       promote_if_first(snapshot)
       Result.success(snapshot, duplicate: false)
     rescue Mongo::Error::OperationFailure => e
-      raise unless e.code == DUPLICATE_KEY
+      raise unless MongoErrors.duplicate_key?(e)
 
       existing = find_duplicate
       existing ? Result.success(existing, duplicate: true) : raise
@@ -60,7 +59,7 @@ module Ingestion
         snapshot
       rescue Mongo::Error::OperationFailure => e
         # Another writer took this version number; recompute and retry.
-        raise unless e.code == DUPLICATE_KEY && attempts < MAX_ATTEMPTS && !find_duplicate
+        raise unless MongoErrors.duplicate_key?(e) && attempts < MAX_ATTEMPTS && !find_duplicate
 
         retry
       end
@@ -73,7 +72,7 @@ module Ingestion
 
       snapshot.set(baseline: true)
     rescue Mongo::Error::OperationFailure => e
-      raise unless e.code == DUPLICATE_KEY
+      raise unless MongoErrors.duplicate_key?(e)
 
       snapshot.baseline = false
     end

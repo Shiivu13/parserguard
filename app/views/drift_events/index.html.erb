@@ -1,9 +1,8 @@
-<% content_for :title, "Drift timeline" %>
-<h1>Drift timeline</h1>
+<%= page_head "Drift timeline", "Every comparison of a new capture against its target's baseline." %>
 
 <div data-controller="timeline-filter">
   <fieldset class="filters">
-    <legend>Show severities</legend>
+    <legend>Show</legend>
     <% DriftEvent::SEVERITIES.each do |sev| %>
       <label>
         <input type="checkbox" value="<%= sev %>" checked

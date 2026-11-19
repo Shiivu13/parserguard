@@ -1,20 +1,19 @@
-<% content_for :title, "Snapshots" %>
-<h1>Snapshots<%= " · #{@engine}" if @engine %></h1>
+<%= page_head "Snapshots#{" · #{@engine}" if @engine}", "Captured result pages. The first capture of each target becomes its baseline." %>
+
 <% if @snapshots.empty? %>
   <p class="empty">No snapshots.</p>
 <% else %>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Captured</th><th>Target</th><th>Version</th><th>Source</th><th>Size</th><th></th></tr></thead>
+      <thead><tr><th>Captured</th><th>Target</th><th>Version</th><th>Source</th><th class="right">Size</th></tr></thead>
       <tbody>
         <% @snapshots.each do |s| %>
           <tr>
             <td><%= ago(s.captured_at) %></td>
             <td><%= target_label(s.engine, s.locale, s.device) %></td>
-            <td><%= link_to "v#{s.version}", snapshot_path(s) %><%= tag.span(" baseline", class: "badge badge-none") if s.baseline %></td>
+            <td><%= link_to "v#{s.version}", snapshot_path(s) %> <%= tag.span("baseline", class: "badge badge-plain") if s.baseline %></td>
             <td><%= s.source %> <span class="muted"><%= s.source_ref %></span></td>
-            <td><%= number_to_human_size(s.byte_size) %></td>
-            <td><%= link_to "Open", snapshot_path(s) %></td>
+            <td class="right num"><%= number_to_human_size(s.byte_size) %></td>
           </tr>
         <% end %>
       </tbody>
