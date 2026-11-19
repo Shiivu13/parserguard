@@ -1,0 +1,22 @@
+# Contract for Google organic results, written against the baseline layout.
+# Selectors are evaluated inside each container node.
+engine: google
+result_type: organic_results
+scope_selector: "#rso"
+container_selector: "div.g"
+min_extraction_rate: 0.9
+fields:
+  - name: title
+    selector: "h3.LC20lb"
+    value_type: string
+  - name: link
+    selector: "div.yuRUbf > a"
+    extract: href
+    value_type: url
+  - name: snippet
+    selector: "div.VwiC3b"
+    value_type: string
+  - name: displayed_link
+    selector: "cite.qLRx3b"
+    value_type: string
+    required: false
