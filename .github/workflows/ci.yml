@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:8.0
+        ports: ["27017:27017"]
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      RAILS_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Lint
+        run: bin/rubocop
+      - name: Specs
+        run: bundle exec rspec
+      - name: Parser regression suite
+        run: bin/rails parserguard:regression

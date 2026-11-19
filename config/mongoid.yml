@@ -1,0 +1,29 @@
+development:
+  clients:
+    default:
+      uri: <%= ENV.fetch("MONGODB_URI", "mongodb://localhost:27017/parser_guard_development") %>
+      options:
+        server_selection_timeout: 5
+  options:
+    raise_not_found_error: false
+
+test:
+  clients:
+    default:
+      uri: <%= ENV.fetch("MONGODB_TEST_URI", "mongodb://localhost:27017/parser_guard_test") %>
+      options:
+        read:
+          mode: :primary
+        max_pool_size: 1
+        server_selection_timeout: 5
+  options:
+    raise_not_found_error: false
+
+production:
+  clients:
+    default:
+      uri: <%= ENV["MONGODB_URI"] %>
+      options:
+        server_selection_timeout: 5
+  options:
+    raise_not_found_error: false
