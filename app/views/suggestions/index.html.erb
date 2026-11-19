@@ -1,0 +1,30 @@
+<% content_for :title, "Suggestions" %>
+<h1>Selector suggestions</h1>
+
+<nav class="tabs" aria-label="Status">
+  <% SelectorSuggestion::STATUSES.each do |st| %>
+    <%= link_to st.capitalize, suggestions_path(status: st), class: ("active" if st == @status) %>
+  <% end %>
+</nav>
+
+<% if @suggestions.empty? %>
+  <p class="empty">No <%= @status %> suggestions.</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Created</th><th>Contract</th><th>Field</th><th>Old</th><th>Top candidate</th><th>Confidence</th></tr></thead>
+      <tbody>
+        <% @suggestions.each do |s| top = s.top_candidate %>
+          <tr>
+            <td><%= ago(s.created_at) %></td>
+            <td><%= @contracts[s.contract_id]&.key %></td>
+            <td><%= link_to s.field_name, suggestion_path(s) %></td>
+            <td><code><%= s.old_selector %></code></td>
+            <td><%= top ? tag.code(top["selector"]) : "none found" %></td>
+            <td><%= top ? safe_join([ meter(top["confidence"]), " ", pct(top["confidence"]) ]) : "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

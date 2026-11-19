@@ -1,0 +1,10 @@
+<% if paths.empty? %>
+  <p class="empty">None.</p>
+<% else %>
+  <ol class="paths">
+    <% paths.first(20).each do |p| %>
+      <li><span class="delta"><%= sign %><%= p["delta"] %></span> <code><%= p["path"] %></code></li>
+    <% end %>
+  </ol>
+  <% if paths.size > 20 %><p class="muted">+<%= paths.size - 20 %> more</p><% end %>
+<% end %>

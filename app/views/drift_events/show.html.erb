@@ -1,0 +1,62 @@
+<% content_for :title, "Drift #{@event.severity}" %>
+
+<div class="title-row">
+  <h1><%= severity_badge(@event.severity) %> Drift on <%= target_label(@event.engine, @event.locale, @event.device) %></h1>
+  <% unless @event.acknowledged_at %>
+    <%= button_to "Acknowledge", acknowledge_drift_event_path(@event), class: "btn" %>
+  <% end %>
+</div>
+
+<section class="stats">
+  <div class="stat"><span class="stat-label">Drift score</span><span class="stat-value"><%= score(@event.drift_score) %></span></div>
+  <div class="stat"><span class="stat-label">Tag drift</span><span class="stat-value"><%= score(@event.tag_drift) %></span></div>
+  <div class="stat"><span class="stat-label">Class drift</span><span class="stat-value"><%= score(@event.class_drift) %></span></div>
+  <div class="stat"><span class="stat-label">Compared</span>
+    <span class="stat-value small">
+      <%= link_to "v#{@baseline.version}", snapshot_path(@baseline) %> → <%= link_to "v#{@candidate.version}", snapshot_path(@candidate) %>
+    </span></div>
+</section>
+
+<h2>Broken fields</h2>
+<% if @event.broken_fields.empty? %>
+  <p class="empty">Contracts still pass. Layout changed, extraction did not.</p>
+<% else %>
+  <ul class="pill-list">
+    <% @event.broken_fields.each do |f| %>
+      <li><code><%= f["contract"] %>#<%= f["field"] %></code> <span class="muted">rate <%= pct(f["rate"]) %></span></li>
+    <% end %>
+  </ul>
+<% end %>
+
+<h2>Suggestions</h2>
+<% if @suggestions.empty? %>
+  <p class="empty">No suggestions for this event (healing runs in the background).</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Old selector</th><th>Top candidate</th><th>Confidence</th><th>Status</th></tr></thead>
+      <tbody>
+        <% @suggestions.each do |s| top = s.top_candidate %>
+          <tr>
+            <td><%= link_to s.field_name, suggestion_path(s) %></td>
+            <td><code><%= s.old_selector %></code></td>
+            <td><%= top ? tag.code(top["selector"]) : "none found" %></td>
+            <td><%= top ? pct(top["confidence"]) : "—" %></td>
+            <td><%= status_badge(s.status) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<div class="split">
+  <section>
+    <h2>Paths added</h2>
+    <%= render "drift_events/paths", paths: @event.added_paths, sign: "+" %>
+  </section>
+  <section>
+    <h2>Paths removed</h2>
+    <%= render "drift_events/paths", paths: @event.removed_paths, sign: "−" %>
+  </section>
+</div>
