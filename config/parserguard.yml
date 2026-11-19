@@ -1,0 +1,28 @@
+# Tunables for drift detection and self-healing. See docs/ALGORITHMS.md.
+default: &default
+  drift:
+    tag_weight: 0.6
+    class_weight: 0.4
+    path_depth: 6
+    minor_threshold: 0.05
+    major_threshold: 0.20
+    broken_rate: 0.5
+    top_paths: 50
+  healing:
+    max_samples: 8
+    min_similarity: 0.85
+    min_confidence: 0.4
+    max_candidates: 5
+    max_text_length: 300
+  ingestion:
+    timeout: 10
+    max_bytes: 5242880
+  alerts:
+    webhook_url: <%= ENV["PARSERGUARD_WEBHOOK_URL"] %>
+
+development:
+  <<: *default
+test:
+  <<: *default
+production:
+  <<: *default

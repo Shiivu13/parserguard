@@ -38,5 +38,9 @@ module ParserGuard
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+    config.generators.test_framework :rspec
+
+    # Sidekiq in production; JOB_ADAPTER=async for Windows dev without Redis.
+    config.active_job.queue_adapter = ENV.fetch("JOB_ADAPTER", "sidekiq").to_sym
   end
 end
