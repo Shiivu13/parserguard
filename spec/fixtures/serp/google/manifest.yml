@@ -15,8 +15,8 @@ fixtures:
     description: Same DOM tree, obfuscated class names rotated.
     expect:
       organic_results_rate: [0.0, 0.89]
-      drift_score: [0.05, 0.6]
-      severity: [minor, major]
+      drift_score: [0.2, 0.6]
+      severity: [major, broken]
       healed_rate_min: 0.9
 
   - file: structural_change.html
