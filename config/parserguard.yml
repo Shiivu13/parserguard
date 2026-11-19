@@ -19,6 +19,11 @@ default: &default
     max_bytes: 5242880
   alerts:
     webhook_url: <%= ENV["PARSERGUARD_WEBHOOK_URL"] %>
+  # Targets fetched by ScheduledIngestJob (cron in config/schedule.yml).
+  # SerpApi targets need SERPAPI_KEY; url targets go through the SSRF guard.
+  watch: []
+  #  - { engine: google, query: "web scraping ruby", location: "Austin, Texas" }
+  #  - { engine: google, url: "https://serp-mirror.example.com/q.html" }
 
 development:
   <<: *default

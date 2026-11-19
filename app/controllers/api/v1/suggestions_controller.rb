@@ -32,8 +32,9 @@ module Api
 
       private
 
-      # Hook for background processing (re-run contracts after a selector change).
-      def after_accept(_suggestion); end
+      def after_accept(suggestion)
+        RunContractsJob.perform_later(suggestion.contract_id.to_s, suggestion.snapshot_id.to_s) if suggestion.snapshot_id
+      end
     end
   end
 end

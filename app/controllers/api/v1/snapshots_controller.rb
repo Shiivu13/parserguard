@@ -47,8 +47,9 @@ module Api
         end
       end
 
-      # Hook for background processing (drift detection).
-      def after_create(_snapshot); end
+      def after_create(snapshot)
+        DetectDriftJob.perform_later(snapshot.id.to_s) unless snapshot.baseline
+      end
     end
   end
 end
