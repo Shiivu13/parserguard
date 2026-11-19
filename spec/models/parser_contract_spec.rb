@@ -7,9 +7,9 @@ RSpec.describe ParserContract do
 
   it "rejects duplicate field names" do
     contract = build(:parser_contract)
-    contract.fields << build(:field_spec, name: "title")
+    contract.field_specs << build(:field_spec, name: "title")
     expect(contract).not_to be_valid
-    expect(contract.errors[:fields].join).to include("title")
+    expect(contract.errors[:field_specs].join).to include("title")
   end
 
   it "is unique per engine + result_type" do
@@ -19,7 +19,7 @@ RSpec.describe ParserContract do
 
   it "validates embedded field value types" do
     contract = build(:parser_contract)
-    contract.fields.first.value_type = "date"
+    contract.field_specs.first.value_type = "date"
     expect(contract).not_to be_valid
   end
 

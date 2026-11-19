@@ -12,7 +12,7 @@ FactoryBot.define do
   factory :field_spec do
     name { "title" }
     selector { "h3" }
-    attribute { "text" }
+    extract { "text" }
     required { true }
     value_type { "string" }
   end
@@ -22,10 +22,10 @@ FactoryBot.define do
     sequence(:result_type) { |n| "organic_results_#{n}" }
     container_selector { "#rso div.g" }
     min_extraction_rate { 0.9 }
-    fields do
+    field_specs do
       [
         build(:field_spec, name: "title", selector: "h3"),
-        build(:field_spec, name: "link", selector: "a[href]", attribute: "href", value_type: "url"),
+        build(:field_spec, name: "link", selector: "a[href]", extract: "href", value_type: "url"),
         build(:field_spec, name: "snippet", selector: "div.VwiC3b", required: false)
       ]
     end

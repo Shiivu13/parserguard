@@ -14,7 +14,7 @@ class ParserContract
   field :version, type: Integer, default: 1
   field :active, type: Boolean, default: true
 
-  embeds_many :fields, class_name: "FieldSpec", cascade_callbacks: true
+  embeds_many :field_specs, class_name: "FieldSpec", cascade_callbacks: true
   embeds_many :revisions, class_name: "ContractRevision"
   has_many :contract_runs, inverse_of: :contract, dependent: :destroy
   has_many :selector_suggestions, inverse_of: :contract, dependent: :destroy
@@ -30,9 +30,9 @@ class ParserContract
 
   def key = "#{engine}/#{result_type}"
 
-  def field_spec(name) = fields.detect { |f| f.name == name.to_s }
+  def field_spec(name) = field_specs.detect { |f| f.name == name.to_s }
 
-  def required_fields = fields.select(&:required)
+  def required_fields = field_specs.select(&:required)
 
   # Current selector for a field name, or the container selector for "_container".
   def selector_for(name)
@@ -42,7 +42,7 @@ class ParserContract
   private
 
   def field_names_unique
-    dupes = fields.map(&:name).tally.select { |_, n| n > 1 }.keys
-    errors.add(:fields, "duplicate names: #{dupes.join(', ')}") if dupes.any?
+    dupes = field_specs.map(&:name).tally.select { |_, n| n > 1 }.keys
+    errors.add(:field_specs, "duplicate names: #{dupes.join(', ')}") if dupes.any?
   end
 end
