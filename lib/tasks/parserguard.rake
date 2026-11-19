@@ -87,3 +87,11 @@ namespace :parserguard do
     puts "  (no candidates: manual fix needed)" if result.value.candidates.empty?
   end
 end
+
+namespace :parserguard do
+  desc "Create an API key (NAME=...). The token is printed once."
+  task api_key: :environment do
+    _key, token = ApiKey.generate!(name: ENV.fetch("NAME", "default"))
+    puts token
+  end
+end
