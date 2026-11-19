@@ -13,12 +13,29 @@ module Healing
     def call
       return Result.failure("suggestion is already #{@suggestion.status}") unless @suggestion.pending?
       return Result.failure("no selector to apply") if @selector.empty?
-      return Result.failure("invalid CSS selector: #{@selector}") unless valid_css?
+      reason = Contracts::SelectorPolicy.violation(@selector)
+      return Result.failure("selector #{reason}") if reason
 
       contract = @suggestion.contract
       from = contract.selector_for(@suggestion.field_name)
       return Result.failure("field #{@suggestion.field_name} no longer exists") if from.nil?
 
+      # Claim atomically so two concurrent accepts cannot both apply.
+      claimed = SelectorSuggestion.where(_id: @suggestion.id, status: "pending")
+                                  .find_one_and_update({ "$set" => { status: "accepting" } })
+      return Result.failure("suggestion is already #{@suggestion.reload.status}") unless claimed
+
+      begin
+        apply_and_record(contract, from)
+      rescue StandardError
+        SelectorSuggestion.where(_id: @suggestion.id, status: "accepting").update_all(status: "pending")
+        raise
+      end
+    end
+
+    private
+
+    def apply_and_record(contract, from)
       apply(contract)
       contract.version += 1
       contract.revisions << ContractRevision.new(
@@ -35,21 +52,12 @@ module Healing
       Result.success(contract)
     end
 
-    private
-
     def apply(contract)
       if @suggestion.container?
         contract.container_selector = @selector
       else
         contract.field_spec(@suggestion.field_name).selector = @selector
       end
-    end
-
-    def valid_css?
-      Nokogiri::HTML5.fragment("<p></p>").css(@selector)
-      true
-    rescue Nokogiri::CSS::SyntaxError, Nokogiri::XML::XPath::SyntaxError
-      false
     end
   end
 end

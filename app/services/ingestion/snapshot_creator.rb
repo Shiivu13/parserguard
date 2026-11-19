@@ -26,7 +26,11 @@ module Ingestion
       existing = find_duplicate
       return Result.success(existing, duplicate: true) if existing
 
-      signature = Html::StructureSignature.call(Html::Normalizer.call(@html))
+      signature = begin
+        Html::StructureSignature.call(Html::Normalizer.call(@html))
+      rescue Html::Normalizer::TooDeep => e
+        return Result.failure(e.message)
+      end
       snapshot = persist(signature)
       return Result.failure(snapshot.errors.full_messages) unless snapshot.persisted?
 

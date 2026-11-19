@@ -5,16 +5,19 @@ module Alerts
 
     module_function
 
+    # Slack mrkdwn control characters; also neutralizes <!channel> and <url|text> links.
+    def escape(text) = text.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").tr("`", "'")
+
     def call(event, app_url: ENV["APP_URL"])
-      fields = event.broken_fields.map { |f| "`#{f['contract']}##{f['field']}` (rate #{format('%.2f', f['rate'].to_f)})" }
+      fields = event.broken_fields.map { |f| "`#{escape(f['contract'])}##{escape(f['field'])}` (rate #{format('%.2f', f['rate'].to_f)})" }
       headline = "#{EMOJI[event.severity]} *#{event.severity.upcase}* layout drift on " \
-                 "#{event.engine} #{event.locale}/#{event.device} (score #{format('%.3f', event.drift_score)})"
+                 "#{escape(event.engine)} #{escape(event.locale)}/#{escape(event.device)} (score #{format('%.3f', event.drift_score)})"
       lines = [ headline ]
       lines << "Broken: #{fields.join(', ')}" if fields.any?
       lines << "<#{app_url.chomp('/')}/drift_events/#{event.id}|Open in ParserGuard>" if app_url.present?
 
       {
-        text: lines.first.gsub(/[*:]/, "").squish,
+        text: lines.first.gsub(/\*|:[a-z_]+:/, "").squish,
         blocks: [ { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } } ],
         parserguard: {
           drift_event_id: event.id.to_s, severity: event.severity, drift_score: event.drift_score,

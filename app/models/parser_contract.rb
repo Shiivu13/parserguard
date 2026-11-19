@@ -22,6 +22,8 @@ class ParserContract
   index({ engine: 1, result_type: 1 }, { unique: true })
 
   validates :engine, :result_type, :container_selector, presence: true
+  validates :engine, :result_type, format: { with: /\A[a-z0-9_]+\z/ }
+  validate :selectors_allowed
   validates :result_type, uniqueness: { scope: :engine }
   validates :min_extraction_rate, numericality: { greater_than: 0, less_than_or_equal_to: 1 }
   validate :field_names_unique
@@ -40,6 +42,15 @@ class ParserContract
   end
 
   private
+
+  def selectors_allowed
+    { scope_selector:, container_selector: }.each do |attr, sel|
+      next if sel.blank?
+
+      reason = Contracts::SelectorPolicy.violation(sel)
+      errors.add(attr, reason) if reason
+    end
+  end
 
   def field_names_unique
     dupes = field_specs.map(&:name).tally.select { |_, n| n > 1 }.keys

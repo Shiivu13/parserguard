@@ -34,6 +34,7 @@ class Snapshot
 
   validates :engine, presence: true, format: { with: /\A[a-z0-9_]+\z/ }
   validates :device, inclusion: { in: DEVICES }
+  validates :locale, format: { with: /\A[a-z]{2,3}(-[A-Za-z0-9]{2,8})*\z/ }
   validates :source, inclusion: { in: SOURCES }
   validates :version, presence: true, numericality: { only_integer: true, greater_than: 0 }
   validates :sha256, presence: true

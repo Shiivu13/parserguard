@@ -7,12 +7,13 @@ class ApplicationController < ActionController::Base
   private
 
   # HTTP basic auth from DASHBOARD_USER / DASHBOARD_PASSWORD.
-  # Production refuses to serve the dashboard without a password configured.
+  # Without a password the dashboard is open only in development and test.
   def require_dashboard_auth
     password = ENV["DASHBOARD_PASSWORD"]
     if password.blank?
-      head :service_unavailable if Rails.env.production?
-      return
+      return if Rails.env.local?
+
+      return render plain: "Set DASHBOARD_PASSWORD to enable the dashboard.", status: :service_unavailable
     end
 
     authenticate_or_request_with_http_basic("ParserGuard") do |user, pass|

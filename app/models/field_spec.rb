@@ -16,4 +16,15 @@ class FieldSpec
   validates :name, presence: true, format: { with: /\A[a-z_][a-z0-9_]*\z/ }
   validates :selector, presence: true
   validates :value_type, inclusion: { in: VALUE_TYPES }
+  validates :extract, format: { with: /\A[a-z][a-z0-9_-]{0,40}\z/ }
+  validate :selector_allowed
+
+  private
+
+  def selector_allowed
+    return if selector.blank?
+
+    reason = Contracts::SelectorPolicy.violation(selector)
+    errors.add(:selector, reason) if reason
+  end
 end

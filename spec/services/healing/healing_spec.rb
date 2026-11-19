@@ -9,7 +9,7 @@ RSpec.describe Healing::TextMatcher do
     expect(described_class.levenshtein("kitten", "sitting")).to eq(3)
     expect(described_class.similarity("abcd", "abcd")).to eq(1.0)
     expect(described_class.similarity("abcdefghij", "abcdefghix")).to eq(0.9)
-    expect(described_class.similarity("short", "a much longer string")).to eq(0.0)
+    expect(described_class.similarity("short", "a much longer string", min: 0.85)).to eq(0.0)
   end
 
   it "keys URLs by host and path" do
@@ -168,7 +168,7 @@ RSpec.describe Healing::SuggestionAcceptor do
   end
 
   it "refuses invalid CSS, empty candidates and already-decided suggestions" do
-    expect(described_class.call(suggestion, selector: "h3[[").error_message).to include("invalid CSS")
+    expect(described_class.call(suggestion, selector: "h3[[").error_message).to include("not valid CSS")
 
     suggestion.update!(candidates: [])
     expect(described_class.call(suggestion).error_message).to eq("no selector to apply")
