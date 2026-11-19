@@ -70,3 +70,20 @@ namespace :parserguard do
     end
   end
 end
+
+namespace :parserguard do
+  desc "Suggest selectors: CONTRACT=google/organic_results FIELD=title|_container SNAPSHOT=id"
+  task heal: :environment do
+    engine, type = ENV.fetch("CONTRACT").split("/", 2)
+    contract = ParserContract.find_by(engine:, result_type: type)
+    snapshot = Snapshot.find(ENV.fetch("SNAPSHOT"))
+    result = Healing::Healer.call(contract:, field_name: ENV.fetch("FIELD"), snapshot:)
+    abort "FAIL #{result.error_message}" if result.failure?
+
+    puts "suggestion #{result.value.id} for #{contract.key}##{result.value.field_name}"
+    result.value.candidates.each do |c|
+      puts format("  %.3f  %-40s cov=%.2f agr=%.2f stab=%.2f", c["confidence"], c["selector"], c["coverage"], c["agreement"], c["stability"])
+    end
+    puts "  (no candidates: manual fix needed)" if result.value.candidates.empty?
+  end
+end
