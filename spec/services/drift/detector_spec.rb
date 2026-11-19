@@ -31,6 +31,13 @@ RSpec.describe Drift::Detector do
     expect(event.drift_score).to be >= 0.2
   end
 
+  it "keeps layout-only drift at minor while every contract passes" do
+    event = detect("ads_added")
+    expect(event.drift_score).to be > 0.2
+    expect(event.broken_fields).to eq([])
+    expect(event.severity).to eq("minor")
+  end
+
   it "marks the consent page as broken" do
     expect(detect("broken").severity).to eq("broken")
   end

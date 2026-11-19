@@ -4,9 +4,12 @@ module Drift
   #
   # Severity:
   #   broken - some contract finds no containers or its rate < broken_rate
-  #   major  - drift_score >= major_threshold, or any required field below the contract minimum
+  #   major  - any required field below the contract minimum, or (no contracts
+  #            for this engine) drift_score >= major_threshold
   #   minor  - drift_score >= minor_threshold
   #   none   - otherwise
+  # When contracts exist and all pass, structure alone never escalates past
+  # minor: an ad block or footer change is worth logging, not paging anyone.
   class Detector
     def self.call(candidate, baseline: nil) = new(candidate, baseline).call
 
@@ -67,7 +70,8 @@ module Drift
 
     def severity(score, runs, broken)
       return "broken" if runs.any? { |r| r.container_count.zero? || r.extraction_rate < @config[:broken_rate] }
-      return "major" if score >= @config[:major_threshold] || broken.any?
+      return "major" if broken.any?
+      return "major" if runs.empty? && score >= @config[:major_threshold]
       return "minor" if score >= @config[:minor_threshold]
 
       "none"
