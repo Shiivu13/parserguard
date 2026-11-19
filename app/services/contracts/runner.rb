@@ -85,7 +85,8 @@ module Contracts
     end
 
     def rate(total, required, valid)
-      return 0.0 if total.zero? || required.empty?
+      return 0.0 if total.zero?
+      return 1.0 if required.empty?
 
       cells = required.sum { |s| valid[s.name] }
       (cells.to_f / (total * required.size)).round(4)

@@ -10,6 +10,14 @@ fixtures:
       drift_score: [0.0, 0.0]
       severity: none
 
+  - file: ads_added.html
+    query: ruby web scraping
+    description: Sponsored block inserted above results; organic results untouched.
+    expect:
+      organic_results_rate: [1.0, 1.0]
+      drift_score: [0.05, 0.3]
+      severity: minor
+
   - file: class_rename.html
     query: ruby web scraping
     description: Same DOM tree, obfuscated class names rotated.

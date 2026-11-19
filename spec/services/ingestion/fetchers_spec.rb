@@ -30,6 +30,43 @@ RSpec.describe Ingestion::UrlFetcher do
     expect(fetcher.call("file:///etc/passwd").error_message).to include("http/https")
   end
 
+  it "connects to the vetted IP instead of resolving the host again (DNS rebinding)" do
+    stub_request(:get, "https://example.com/serp").to_return(body: "ok")
+    expect_any_instance_of(Net::HTTP).to receive(:ipaddr=).with("93.184.216.34").and_call_original
+    expect(fetcher.call("https://example.com/serp")).to be_ok
+  end
+
+  it "asks for an uncompressed body" do
+    stub = stub_request(:get, "https://example.com/serp").with(headers: { "Accept-Encoding" => "identity" }).to_return(body: "ok")
+    fetcher.call("https://example.com/serp")
+    expect(stub).to have_been_requested
+  end
+
+  it "rejects an oversized Content-Length before reading the body" do
+    stub_request(:get, "https://example.com/huge").to_return(body: "x", headers: { "Content-Length" => "999999999" })
+    expect(fetcher.call("https://example.com/huge").error_message).to include("exceeds")
+  end
+
+  it "hides low-level connection details from callers" do
+    stub_request(:get, "https://example.com/down").to_raise(Errno::ECONNREFUSED.new("10.0.0.5:8080"))
+    expect(fetcher.call("https://example.com/down").error_message).to eq("connection failed")
+  end
+
+  it "accepts bracketed IPv6 literals and vets them" do
+    expect(described_class.new.call("http://[::1]:3000/").error_message).to include("private")
+  end
+
+  [ "::", "::127.0.0.1", "::ffff:127.0.0.1", "64:ff9b::a9fe:a9fe", "2002:7f00:1::", "2001:0:4136::1", "fec0::1", "fd00::1" ].each do |ip|
+    it "blocks IPv6 form #{ip}" do
+      expect(described_class.blocked_ip?(ip)).to be(true)
+    end
+  end
+
+  it "allows ordinary public addresses" do
+    expect(described_class.blocked_ip?("93.184.216.34")).to be(false)
+    expect(described_class.blocked_ip?("2606:4700:4700::1111")).to be(false)
+  end
+
   [ "127.0.0.1", "10.1.2.3", "169.254.169.254", "192.168.1.5", "::1" ].each do |ip|
     it "blocks hosts that resolve to #{ip}" do
       blocked = described_class.new(resolver: ->(_h) { [ ip ] })
@@ -57,6 +94,7 @@ end
 
 RSpec.describe Ingestion::SerpApiFetcher do
   let(:search_url) { %r{\Ahttps://serpapi\.com/search\.json\?} }
+  let(:html_fetcher) { Ingestion::UrlFetcher.new(resolver: ->(_h) { [ "93.184.216.34" ] }) }
 
   it "fails fast without an API key" do
     expect(described_class.call(query: "ruby", api_key: nil).error_message).to eq("SERPAPI_KEY is not set")
@@ -68,7 +106,7 @@ RSpec.describe Ingestion::SerpApiFetcher do
       .to_return(body: { search_metadata: { id: "abc", raw_html_file: "https://serpapi.com/searches/abc.html" } }.to_json)
     stub_request(:get, "https://serpapi.com/searches/abc.html").to_return(body: "<html>serp</html>")
 
-    result = described_class.call(query: "ruby", api_key: "k")
+    result = described_class.call(query: "ruby", api_key: "k", html_fetcher:)
     expect(result.value).to eq("<html>serp</html>")
     expect(result.meta[:source_ref]).to eq("abc")
   end
@@ -80,6 +118,14 @@ RSpec.describe Ingestion::SerpApiFetcher do
     WebMock.reset!
     stub_request(:get, search_url).to_return(body: "nope")
     expect(described_class.call(query: "q", api_key: "k").error_message).to include("invalid JSON")
+  end
+
+  it "refuses raw_html_file URLs outside serpapi.com over https" do
+    [ "http://serpapi.com/x.html", "https://serpapi.com.evil.test/x.html", "https://169.254.169.254/latest" ].each do |url|
+      WebMock.reset!
+      stub_request(:get, search_url).to_return(body: { search_metadata: { raw_html_file: url } }.to_json)
+      expect(described_class.call(query: "q", api_key: "k", html_fetcher:).error_message).to include("not an https serpapi.com URL")
+    end
   end
 
   it "reports HTTP errors without leaking the key" do

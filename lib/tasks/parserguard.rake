@@ -116,3 +116,17 @@ namespace :parserguard do
     puts "Open http://localhost:3000 to review #{SelectorSuggestion.pending.count} pending suggestions."
   end
 end
+
+namespace :parserguard do
+  desc "Replay fixture manifests through ingest/drift/heal; exits 1 on any failed expectation"
+  task regression: :environment do
+    report = Regression::Runner.call
+    report.each do |c|
+      actual = c.actual.is_a?(Float) ? c.actual.round(4) : c.actual
+      puts format("%-4s %-8s %-24s %-26s expected %-18s got %s", c.ok ? "ok" : "FAIL", c.engine, c.fixture, c.check, c.expected, actual)
+    end
+    failed = report.count { |c| !c.ok }
+    puts "#{report.size} checks, #{failed} failed"
+    exit(1) if failed.positive? || report.empty?
+  end
+end

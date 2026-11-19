@@ -61,8 +61,8 @@ RSpec.describe Ingestion::FixtureImporter do
 
     expect(results).to all(be_ok)
     snaps = results.map(&:value)
-    expect(snaps.map(&:source_ref)).to eq(%w[baseline.html class_rename.html structural_change.html broken.html])
-    expect(snaps.map(&:version)).to eq([ 1, 2, 3, 4 ])
+    expect(snaps.map(&:source_ref)).to eq(%w[baseline.html ads_added.html class_rename.html structural_change.html broken.html])
+    expect(snaps.map(&:version)).to eq([ 1, 2, 3, 4, 5 ])
     expect(Snapshot.baseline_for("google", "en-US", "desktop").source_ref).to eq("baseline.html")
   end
 
@@ -70,6 +70,6 @@ RSpec.describe Ingestion::FixtureImporter do
     dir = Rails.root.join("spec/fixtures/serp/google")
     described_class.call(dir:)
     described_class.call(dir:)
-    expect(Snapshot.count).to eq(4)
+    expect(Snapshot.count).to eq(5)
   end
 end

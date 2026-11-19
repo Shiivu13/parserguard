@@ -61,7 +61,7 @@ RSpec.describe "API v1", type: :request do
     it "paginates, filters and only returns html when asked" do
       snaps = import_google_fixtures
       api_get "/api/v1/snapshots", per: 2, page: 2
-      expect(json["meta"]).to eq("page" => 2, "per" => 2, "total" => 4)
+      expect(json["meta"]).to eq("page" => 2, "per" => 2, "total" => 5)
       expect(json["data"].size).to eq(2)
 
       api_get "/api/v1/snapshots", baseline: "true"

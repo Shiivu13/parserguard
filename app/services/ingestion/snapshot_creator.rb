@@ -11,8 +11,8 @@ module Ingestion
     def self.call(**) = new(**).call
 
     def initialize(html:, engine:, source:, query: nil, locale: "en-US", device: "desktop",
-                   source_ref: nil, captured_at: nil)
-      @html = html.to_s
+                   source_ref: nil, captured_at: nil, charset: nil)
+      @html = Html::Encoding.to_utf8(html, charset:)
       @attrs = { engine:, source:, query:, locale:, device:, source_ref:,
                  captured_at: captured_at || Time.current }
     end
@@ -26,7 +26,11 @@ module Ingestion
       existing = find_duplicate
       return Result.success(existing, duplicate: true) if existing
 
-      signature = Html::StructureSignature.call(Html::Normalizer.call(@html))
+      signature = begin
+        Html::StructureSignature.call(Html::Normalizer.call(@html))
+      rescue Html::Normalizer::TooDeep => e
+        return Result.failure(e.message)
+      end
       snapshot = persist(signature)
       return Result.failure(snapshot.errors.full_messages) unless snapshot.persisted?
 
@@ -41,7 +45,9 @@ module Ingestion
 
     private
 
-    def find_duplicate = Snapshot.light.where(sha256: Snapshot.digest(@html)).first
+    def find_duplicate
+      Snapshot.for_target(@attrs[:engine], @attrs[:locale], @attrs[:device]).where(sha256: Snapshot.digest(@html)).first
+    end
 
     def persist(signature)
       attempts = 0
@@ -60,10 +66,16 @@ module Ingestion
       end
     end
 
+    # The partial unique index makes this race-safe: a concurrent first
+    # snapshot that loses simply stays a non-baseline.
     def promote_if_first(snapshot)
-      return if Snapshot.baseline_for(*snapshot.target)
+      return if Snapshot.for_target(*snapshot.target).where(baseline: true).exists?
 
-      snapshot.promote_to_baseline!
+      snapshot.set(baseline: true)
+    rescue Mongo::Error::OperationFailure => e
+      raise unless e.code == DUPLICATE_KEY
+
+      snapshot.baseline = false
     end
   end
 end

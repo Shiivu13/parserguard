@@ -21,12 +21,29 @@ module Contracts
       contract = ParserContract.find_or_initialize_by(engine: data.fetch("engine"), result_type: data.fetch("result_type"))
       return Result.success(contract, action: :skipped) if contract.persisted? && !@force
 
-      action = contract.persisted? ? :replaced : :created
-      contract.assign_attributes(data.slice("scope_selector", "container_selector", "min_extraction_rate"))
-      contract.field_specs = data.fetch("fields").map { |f| FieldSpec.new(f.slice("name", "selector", "extract", "required", "value_type")) }
-      contract.version = (contract.version || 0) + 1 if action == :replaced
+      scalars = data.slice("scope_selector", "container_selector", "min_extraction_rate")
+      specs = data.fetch("fields").map { |f| FieldSpec.new(f.slice("name", "selector", "extract", "required", "value_type")) }
 
-      contract.save ? Result.success(contract, action:) : Result.failure(contract.errors.full_messages, file: path.basename.to_s)
+      if contract.persisted?
+        # Validate-then-write; an invalid YAML must not clobber the stored contract.
+        replaced = ParserContract.change!(contract.id) do |doc|
+          scalars.each { |k, v| doc[k] = ParserContract.fields[k].mongoize(v) }
+          doc["field_specs"] = specs.map(&:as_document)
+          {}
+        end
+        return outcome(replaced, :replaced, path)
+      end
+
+      contract.assign_attributes(scalars)
+      contract.field_specs = specs
+      contract.save
+      outcome(contract, :created, path)
+    end
+
+    def outcome(contract, action, path)
+      return Result.success(contract, action:) if contract.errors.empty?
+
+      Result.failure(contract.errors.full_messages, file: path.basename.to_s)
     end
   end
 end

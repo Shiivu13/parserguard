@@ -41,7 +41,10 @@ class SuggestionsController < ApplicationController
 
   def reject
     suggestion = find_or_404(SelectorSuggestion, params[:id])
-    suggestion.update!(status: "rejected") if suggestion.pending?
-    redirect_to suggestion_path(suggestion), notice: "Rejected."
+    if suggestion.reject!
+      redirect_to suggestion_path(suggestion), notice: "Rejected."
+    else
+      redirect_to suggestion_path(suggestion), alert: "Already #{suggestion.status}."
+    end
   end
 end

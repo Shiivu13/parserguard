@@ -24,9 +24,8 @@ module Api
 
       def reject
         suggestion = find!(SelectorSuggestion, params[:id])
-        return render_error(:conflict, "conflict", "suggestion is already #{suggestion.status}") unless suggestion.pending?
+        return render_error(:conflict, "conflict", "suggestion is already #{suggestion.status}") unless suggestion.reject!
 
-        suggestion.update!(status: "rejected")
         render json: { data: ApiSerializer.suggestion(suggestion) }
       end
 

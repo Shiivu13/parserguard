@@ -16,11 +16,11 @@ module Api
 
       # Body: { engine, html } or { engine, url }; optional query, locale, device.
       def create
-        html, source, source_ref = fetch_html
+        html, source, source_ref, charset = fetch_html
         return if performed?
 
         result = Ingestion::SnapshotCreator.call(
-          html:, source:, source_ref:,
+          html:, source:, source_ref:, charset:,
           engine: params.require(:engine), query: params[:query],
           locale: params[:locale].presence || "en-US", device: params[:device].presence || "desktop"
         )
@@ -41,7 +41,7 @@ module Api
           fetched = Ingestion::UrlFetcher.call(params[:url])
           return render_result_error(fetched, status: :bad_gateway) if fetched.failure?
 
-          [ fetched.value, "url", fetched.meta[:final_url] ]
+          [ fetched.value, "url", fetched.meta[:final_url], fetched.meta[:charset] ]
         else
           render_error(:unprocessable_entity, "invalid_params", "provide html or url")
         end

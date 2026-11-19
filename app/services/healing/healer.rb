@@ -26,7 +26,7 @@ module Healing
       return Result.failure("no baseline for #{@snapshot.target.join('/')}") unless @baseline
       return Result.failure("unknown field #{@field_name}") unless container? || @contract.field_spec(@field_name)
 
-      existing = SelectorSuggestion.pending.where(contract_id: @contract.id, field_name: @field_name, snapshot_id: @snapshot.id).first
+      existing = pending_suggestion
       return Result.success(existing, created: false) if existing
 
       samples = baseline_samples
@@ -40,11 +40,20 @@ module Healing
         old_selector: @contract.selector_for(@field_name), candidates: rank(candidates)
       )
       Result.success(suggestion, created: true)
+    rescue Mongo::Error::OperationFailure => e
+      # A concurrent healer created the pending suggestion first.
+      raise unless e.code == Ingestion::SnapshotCreator::DUPLICATE_KEY
+
+      Result.success(pending_suggestion, created: false)
     end
 
     private
 
     def container? = @field_name == ParserContract::CONTAINER_FIELD
+
+    def pending_suggestion
+      SelectorSuggestion.pending.where(contract_id: @contract.id, field_name: @field_name, snapshot_id: @snapshot.id).first
+    end
 
     def sample_field = container? ? anchor_spec&.name : @field_name
 
@@ -56,7 +65,7 @@ module Healing
     # baseline (and stores the run) when none exists yet.
     def baseline_samples
       run = ContractRun.where(contract_id: @contract.id, snapshot_id: @baseline.id, status: "passed").recent.first
-      run ||= Contracts::Runner.call(@contract, @baseline).then { |r| r.passed? ? r : nil }
+      run ||= Contracts::Runner.call(@contract, @baseline.with_html).then { |r| r.passed? ? r : nil }
       return [] unless run && sample_field
 
       run.items.filter_map { |item| item[sample_field] }.uniq.first(@config[:max_samples])
@@ -70,7 +79,8 @@ module Healing
       url = spec.value_type == "url"
       by_pointer = containers.index_by(&:pointer_id)
       raw = samples.flat_map do |sample|
-        node = TextMatcher.find(containers, sample, url:, min_similarity: @config[:min_similarity], max_length: @config[:max_text_length])
+        node = TextMatcher.find(containers, sample, url:, attr: spec.extract,
+                                                    min_similarity: @config[:min_similarity], max_length: @config[:max_text_length])
         next [] unless node
 
         container = ([ node ] + node.ancestors.to_a).detect { |n| by_pointer.key?(n.pointer_id) }

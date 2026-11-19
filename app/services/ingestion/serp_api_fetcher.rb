@@ -6,12 +6,16 @@ module Ingestion
 
     def self.call(**) = new(**).call
 
-    def initialize(query:, engine: "google", location: nil, api_key: ENV["SERPAPI_KEY"], connection: nil)
+    RAW_HTML_HOST = /\A(?:[a-z0-9-]+\.)*serpapi\.com\z/
+
+    def initialize(query:, engine: "google", location: nil, api_key: ENV["SERPAPI_KEY"], connection: nil, html_fetcher: nil)
       @query = query
       @engine = engine
       @location = location
       @api_key = api_key
       @connection = connection || Faraday.new { |f| f.options.timeout = 30 }
+      # The captured page goes through the same SSRF/size guards as any URL.
+      @html_fetcher = html_fetcher || UrlFetcher.new
     end
 
     def call
@@ -24,10 +28,12 @@ module Ingestion
       html_url = metadata["raw_html_file"]
       return Result.failure("SerpApi response has no raw_html_file") if html_url.blank?
 
-      page = @connection.get(html_url)
-      return Result.failure("raw_html_file HTTP #{page.status}") unless page.success?
+      return Result.failure("raw_html_file is not an https serpapi.com URL") unless trusted_html_url?(html_url)
 
-      Result.success(page.body.to_s, source_ref: metadata["id"], raw_html_file: html_url)
+      page = @html_fetcher.call(html_url)
+      return Result.failure("raw_html_file: #{page.error_message}") if page.failure?
+
+      Result.success(page.value, source_ref: metadata["id"], raw_html_file: html_url)
     rescue JSON::ParserError
       Result.failure("SerpApi returned invalid JSON")
     rescue Faraday::Error => e
@@ -35,6 +41,13 @@ module Ingestion
     end
 
     private
+
+    def trusted_html_url?(url)
+      uri = URI.parse(url)
+      uri.scheme == "https" && RAW_HTML_HOST.match?(uri.hostname.to_s.downcase)
+    rescue URI::InvalidURIError
+      false
+    end
 
     def search_params
       { engine: @engine, q: @query, location: @location, api_key: @api_key }.compact

@@ -9,7 +9,7 @@ RSpec.describe Healing::TextMatcher do
     expect(described_class.levenshtein("kitten", "sitting")).to eq(3)
     expect(described_class.similarity("abcd", "abcd")).to eq(1.0)
     expect(described_class.similarity("abcdefghij", "abcdefghix")).to eq(0.9)
-    expect(described_class.similarity("short", "a much longer string")).to eq(0.0)
+    expect(described_class.similarity("short", "a much longer string", min: 0.85)).to eq(0.0)
   end
 
   it "keys URLs by host and path" do
@@ -149,15 +149,12 @@ RSpec.describe Healing::SuggestionAcceptor do
     expect(suggestion.reload).to have_attributes(status: "accepted", accepted_selector: "h3.new")
   end
 
-  it "accepts an explicit selector and rejects siblings for the same snapshot only" do
-    snapshot = create(:snapshot)
-    suggestion.update!(snapshot:)
-    sibling = create(:selector_suggestion, contract:, field_name: "title", snapshot:)
+  it "accepts an explicit selector and leaves other layouts' suggestions pending" do
+    suggestion.update!(snapshot: create(:snapshot))
     other_layout = create(:selector_suggestion, contract:, field_name: "title", snapshot: create(:snapshot))
     described_class.call(suggestion, selector: "div > h3")
 
     expect(contract.reload.field_spec("title").selector).to eq("div > h3")
-    expect(sibling.reload.status).to eq("rejected")
     expect(other_layout.reload.status).to eq("pending")
   end
 
@@ -168,7 +165,7 @@ RSpec.describe Healing::SuggestionAcceptor do
   end
 
   it "refuses invalid CSS, empty candidates and already-decided suggestions" do
-    expect(described_class.call(suggestion, selector: "h3[[").error_message).to include("invalid CSS")
+    expect(described_class.call(suggestion, selector: "h3[[").error_message).to include("not valid CSS")
 
     suggestion.update!(candidates: [])
     expect(described_class.call(suggestion).error_message).to eq("no selector to apply")

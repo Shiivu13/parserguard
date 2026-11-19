@@ -24,7 +24,12 @@ RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
   config.include ActiveJob::TestHelper
 
-  config.before(:suite) { Mongoid::Tasks::Database.create_indexes }
+  config.before(:suite) do
+    # create_indexes only sees loaded models; test env does not eager load.
+    Rails.autoloaders.main.eager_load_dir(Rails.root.join("app/models"))
+    Mongoid::Tasks::Database.create_indexes
+  end
+  config.after(:suite) { Mongoid.default_client.database.drop unless ENV["MONGODB_TEST_URI"] }
   config.before(:each) do
     Mongoid.truncate!
     clear_enqueued_jobs
