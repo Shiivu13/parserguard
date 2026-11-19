@@ -42,7 +42,7 @@ module Healing
       Result.success(suggestion, created: true)
     rescue Mongo::Error::OperationFailure => e
       # A concurrent healer created the pending suggestion first.
-      raise unless e.code == Ingestion::SnapshotCreator::DUPLICATE_KEY
+      raise unless MongoErrors.duplicate_key?(e)
 
       Result.success(pending_suggestion, created: false)
     end
@@ -79,8 +79,7 @@ module Healing
       url = spec.value_type == "url"
       by_pointer = containers.index_by(&:pointer_id)
       raw = samples.flat_map do |sample|
-        node = TextMatcher.find(containers, sample, url:, attr: spec.extract,
-                                                    min_similarity: @config[:min_similarity], max_length: @config[:max_text_length])
+        node = find_sample(containers, sample, url:, attr: spec.extract)
         next [] unless node
 
         container = ([ node ] + node.ancestors.to_a).detect { |n| by_pointer.key?(n.pointer_id) }
@@ -94,6 +93,10 @@ module Healing
         containers:, samples:, extract: spec.extract, value_type: spec.value_type,
         min_similarity: @config[:min_similarity]
       )
+    end
+
+    def find_sample(roots, sample, url:, attr: "href")
+      TextMatcher.find(roots, sample, url:, attr:, min_similarity: @config[:min_similarity], max_length: @config[:max_text_length])
     end
 
     # The matched node plus ancestors (inside the container) that carry the same text.
@@ -110,9 +113,7 @@ module Healing
       roots = doc.css(@contract.scope_selector.presence || "body").to_a
       roots = [ doc.at_css("body") || doc ] if roots.empty?
 
-      matches = samples.filter_map do |sample|
-        TextMatcher.find(roots, sample, url:, min_similarity: @config[:min_similarity], max_length: @config[:max_text_length])
-      end.uniq(&:pointer_id)
+      matches = samples.filter_map { |sample| find_sample(roots, sample, url:) }.uniq(&:pointer_id)
       return [] if matches.size < 2
 
       ancestor_ids = matches.to_h { |m| [ m.pointer_id, m.ancestors.to_set(&:pointer_id) ] }
@@ -151,15 +152,11 @@ module Healing
         rate = Contracts::Runner.evaluate(trial, doc).extraction_rate
 
         uniqueness = [ containers.size, matches.size ].min.to_f / [ containers.size, matches.size ].max
-        confidence = CandidateScorer.confidence(coverage:, agreement: rate, stability: candidate.stability, uniqueness:)
-        [ container_ids.to_a.sort, {
-          "selector" => candidate.selector, "kind" => candidate.kind, "confidence" => confidence,
-          "coverage" => coverage.round(4), "agreement" => rate.round(4), "stability" => candidate.stability,
-          "uniqueness" => uniqueness.round(4), "samples" => [ "#{containers.size} containers" ]
-        } ]
+        row = CandidateScorer.row(candidate, coverage:, agreement: rate, uniqueness:, samples: [ "#{containers.size} containers" ])
+        [ container_ids.to_a.sort, row ]
       end
 
-      scored.group_by(&:first).map { |_, group| group.map(&:last).max_by { |r| [ r["stability"], -r["selector"].length ] } }
+      CandidateScorer.dedupe(scored)
     end
 
     def rank(rows)

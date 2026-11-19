@@ -61,44 +61,56 @@ module Regression
     end
 
     def check_fixture(engine, entry, snapshot)
+      @checks = []
+      @engine = engine
+      @file = entry.fetch("file")
       expect = entry.fetch("expect", {})
-      file = entry.fetch("file")
-      checks = []
-      add = ->(name, expected, actual, ok) { checks << Check.new(engine:, fixture: file, check: name, expected:, actual:, ok:) }
       doc = Html::Normalizer.call(snapshot.html)
       contracts = ParserContract.where(engine:).to_a
 
+      check_rates(expect, contracts, doc)
+      check_drift(expect, snapshot)
+      check_healing(expect, contracts, snapshot, doc) if expect.key?("healed_rate_min") || expect.key?("max_candidate_confidence")
+      @checks
+    end
+
+    def add(name, expected, actual, ok)
+      @checks << Check.new(engine: @engine, fixture: @file, check: name, expected:, actual:, ok:)
+    end
+
+    def check_rates(expect, contracts, doc)
       contracts.each do |contract|
         range = expect["#{contract.result_type}_rate"]
         next unless range
 
         rate = Contracts::Runner.evaluate(contract, doc).extraction_rate
-        add.call("#{contract.result_type}_rate", range, rate, in_range?(rate, range))
+        add("#{contract.result_type}_rate", range, rate, in_range?(rate, range))
       end
+    end
 
+    def check_drift(expect, snapshot)
       event = snapshot.baseline ? nil : Drift::Detector.call(snapshot).value
-      if expect["drift_score"]
+      if (range = expect["drift_score"])
         score = event ? event.drift_score : 0.0
-        add.call("drift_score", expect["drift_score"], score, in_range?(score, expect["drift_score"]))
+        add("drift_score", range, score, in_range?(score, range))
       end
-      if expect["severity"]
+      if (wanted = expect["severity"])
         severity = event ? event.severity : "none"
-        add.call("severity", expect["severity"], severity, Array(expect["severity"]).include?(severity))
+        add("severity", wanted, severity, Array(wanted).include?(severity))
       end
+    end
 
-      if expect.key?("healed_rate_min") || expect.key?("max_candidate_confidence")
-        top_confidences = []
-        rates = contracts.map { |c| heal_until_passing(c, snapshot, doc, top_confidences) }
-        if expect["healed_rate_min"]
-          worst = rates.min || 0.0
-          add.call("healed_rate", ">= #{expect['healed_rate_min']}", worst, worst >= expect["healed_rate_min"])
-        end
-        if expect["max_candidate_confidence"]
-          best = top_confidences.max || 0.0
-          add.call("max_candidate_confidence", "< #{expect['max_candidate_confidence']}", best, best < expect["max_candidate_confidence"])
-        end
+    def check_healing(expect, contracts, snapshot, doc)
+      top_confidences = []
+      worst = contracts.map { |c| heal_until_passing(c, snapshot, doc, top_confidences) }.min || 0.0
+      best = top_confidences.max || 0.0
+
+      if (min = expect["healed_rate_min"])
+        add("healed_rate", ">= #{min}", worst, worst >= min)
       end
-      checks
+      if (max = expect["max_candidate_confidence"])
+        add("max_candidate_confidence", "< #{max}", best, best < max)
+      end
     end
 
     # Accept the top candidate for each failing field, re-evaluate, repeat.

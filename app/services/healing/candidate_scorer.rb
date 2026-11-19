@@ -15,6 +15,23 @@ module Healing
         WEIGHTS[:stability] * stability + WEIGHTS[:uniqueness] * uniqueness).round(4)
     end
 
+    # The hash stored in SelectorSuggestion#candidates.
+    def self.row(candidate, coverage:, agreement:, uniqueness:, samples:)
+      {
+        "selector" => candidate.selector, "kind" => candidate.kind,
+        "confidence" => confidence(coverage:, agreement:, stability: candidate.stability, uniqueness:),
+        "coverage" => coverage.round(4), "agreement" => agreement.round(4),
+        "stability" => candidate.stability, "uniqueness" => uniqueness.round(4), "samples" => samples
+      }
+    end
+
+    # Several selectors often hit the same nodes; keep the most stable, then the shortest.
+    def self.dedupe(rows_by_signature)
+      rows_by_signature.group_by(&:first).map do |_, group|
+        group.map(&:last).max_by { |row| [ row["stability"], -row["selector"].length ] }
+      end
+    end
+
     def self.call(candidates, **) = new(**).call(candidates)
 
     def initialize(containers:, samples:, extract:, value_type:, min_similarity: 0.85)
@@ -26,10 +43,7 @@ module Healing
     end
 
     def call(candidates)
-      scored = candidates.filter_map { |c| score(c) }
-      scored.group_by { |s| s[:signature] }
-            .map { |_, group| group.max_by { |s| [ s[:row]["stability"], -s[:row]["selector"].length ] } }
-            .map { |s| s[:row] }
+      self.class.dedupe(candidates.filter_map { |c| score(c) })
     end
 
     private
@@ -52,18 +66,14 @@ module Healing
       end
       return nil if values.empty?
 
-      coverage = values.size.to_f / @containers.size
-      agreement = agreement_for(values)
-      uniqueness = 1.0 / (match_counts.sum.to_f / match_counts.size)
-
-      row = {
-        "selector" => candidate.selector, "kind" => candidate.kind,
-        "coverage" => coverage.round(4), "agreement" => agreement.round(4),
-        "stability" => candidate.stability, "uniqueness" => uniqueness.round(4),
-        "samples" => values.first(3).map(&:to_s)
-      }
-      row["confidence"] = self.class.confidence(coverage:, agreement:, stability: candidate.stability, uniqueness:)
-      { row:, signature: }
+      row = self.class.row(
+        candidate,
+        coverage: values.size.to_f / @containers.size,
+        agreement: agreement_for(values),
+        uniqueness: match_counts.size.to_f / match_counts.sum,
+        samples: values.first(3).map(&:to_s)
+      )
+      [ signature, row ]
     rescue Nokogiri::CSS::SyntaxError, Nokogiri::XML::XPath::SyntaxError
       nil
     end

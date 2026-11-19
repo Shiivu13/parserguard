@@ -1,5 +1,5 @@
-<% content_for :title, "Contracts" %>
-<h1>Contracts</h1>
+<%= page_head "Contracts", "What each parser extracts, and from where. Loaded from config/contracts/*.yml." %>
+
 <div class="table-wrap">
   <table>
     <thead><tr><th>Contract</th><th>Container</th><th>Fields</th><th>Min rate</th><th>Version</th><th>Active</th></tr></thead>
@@ -7,10 +7,10 @@
       <% @contracts.each do |c| %>
         <tr>
           <td><%= link_to c.key, contract_path(c) %></td>
-          <td><code><%= c.container_selector %></code></td>
-          <td><%= c.field_specs.size %></td>
-          <td><%= pct(c.min_extraction_rate) %></td>
-          <td>v<%= c.version %></td>
+          <td><%= selector(c.container_selector) %></td>
+          <td class="num"><%= c.field_specs.size %></td>
+          <td class="num"><%= pct(c.min_extraction_rate) %></td>
+          <td class="num">v<%= c.version %></td>
           <td><%= c.active ? "yes" : "no" %></td>
         </tr>
       <% end %>

@@ -41,7 +41,7 @@ module Drift
       Result.success(event, created: true, runs:)
     rescue Mongo::Error::OperationFailure => e
       # Concurrent detector for the same pair won the unique index.
-      raise unless e.code == Ingestion::SnapshotCreator::DUPLICATE_KEY
+      raise unless MongoErrors.duplicate_key?(e)
 
       Result.success(DriftEvent.find_by(baseline_snapshot_id: @baseline.id, candidate_snapshot_id: @candidate.id), created: false)
     end

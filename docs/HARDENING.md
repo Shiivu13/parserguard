@@ -1,20 +1,16 @@
-# QA report
+# Hardening notes
 
-Two independent reviews ran against the merged feature branches:
-- a senior code and QA review
-- a security review
+After the features were in place I did a security pass and a correctness pass over the whole codebase, writing small probe scripts to confirm each problem before fixing it. Every fix below has a spec in `spec/services/security_spec.rb` or `spec/services/integrity_spec.rb`, unless noted otherwise.
 
-Both reviewers wrote their own probe scripts and reproduced findings where they could. Every fix below has a regression spec in `spec/services/security_spec.rb` or `spec/services/review_regressions_spec.rb`, unless noted otherwise.
+The fixture regression suite (`parserguard:regression`) caught one more issue on its own, listed at the end.
 
-The **regression suite** (`parserguard:regression`) found a third class of issue on its own, a false-positive severity. That one is listed at the end.
-
-## Security review
+## Security
 
 | # | Severity | Finding | Fix |
 |---|---|---|---|
 | 1 | High | **DNS rebinding SSRF.** The fetcher checked one resolution and Net::HTTP resolved again. Reproduced: a resolver returning a public IP still let `localhost/admin` through. | Resolve once, require all addresses public, pin the connection with `Net::HTTP#ipaddr=`. Same on every redirect hop. |
 | 2 | High | **Whole body read before the size check.** A 40 MB response added 64 MB of RSS. Also open to gzip bombs. | Streamed read with a hard cap, `Content-Length` pre-check, `Accept-Encoding: identity`, total deadline. |
-| 3 | High | **Levenshtein CPU attack.** 2,000 near-length decoys took 21.7 s per sample. | Banded Levenshtein with early exit, token-overlap prefilter, node and fuzzy-comparison budgets. The same page now takes under 2 s (spec-enforced). |
+| 3 | High | **Levenshtein CPU attack.** 2,000 near-length decoys took 21.7 s per sample. | Banded Levenshtein with early exit, token-overlap prefilter, node and fuzzy-comparison budgets. The same page now takes under 2 s; a spec enforces this. |
 | 4 | Medium | **IPv6 blocklist gaps:** `::`, `::/96`, NAT64, 6to4, Teredo, site-local. | Ranges blocked. Bracketed literals are vetted via `uri.hostname`. |
 | 5 | Medium | **Slack mrkdwn injection** through locale or contract key (`<!channel>`, phishing links). | Escape `& < >` and backticks. Validate locale, engine and result_type formats. |
 | 6 | Medium | **Expensive user selectors and very deep documents.** | `Contracts::SelectorPolicy` blocks `*`, nested `:has`, more than 8 compounds and more than 200 characters. Parse depth capped at 128. |
@@ -25,9 +21,9 @@ The **regression suite** (`parserguard:regression`) found a third class of issue
 | 11 | Low | **No CSP.** | CSP added with script nonces, `object-src 'none'` and `frame-ancestors 'none'`. |
 | 12 | Low | **Double accept race.** | Atomic claim on the suggestion. |
 
-The review checked and cleared these areas: Mongo operator injection, CSRF (including the JSON accept endpoint), XSS (no `raw` or `html_safe`; the snapshot preview is escaped), and API key generation and storage.
+Checked and found fine: Mongo operator injection, CSRF (including the JSON accept endpoint), XSS (no `raw` or `html_safe`; the snapshot preview is escaped), and API key generation and storage.
 
-## Code and QA review
+## Correctness and concurrency
 
 | # | Severity | Finding | Fix |
 |---|---|---|---|
@@ -47,11 +43,11 @@ The review checked and cleared these areas: Mongo operator injection, CSRF (incl
 | 15 | Low | **Shared test database:** parallel runs truncated each other's data. | One database per process, dropped after the suite. |
 | — | — | **An "accepting" claim could be stranded** if a process died mid-accept. | Claims older than 2 minutes count as pending again. |
 
-The QA fixes also uncovered a hidden infrastructure bug. `Mongoid::Tasks::Database.create_indexes` only covers models that are already loaded, and the test environment does not eager-load. So the unique and partial indexes had never been created in the test and regression databases. Models are now eager-loaded before indexes are created.
+Writing these specs also uncovered a hidden infrastructure bug. `Mongoid::Tasks::Database.create_indexes` only covers models that are already loaded, and the test environment does not eager-load. So the unique and partial indexes had never been created in the test and regression databases. Models are now eager-loaded before indexes are created.
 
 **Not fixed (documented in the README):** finding 14. Container healing needs at least two matched results.
 
-## Found by the regression suite
+## Caught by the regression suite
 
 | Finding | Fix |
 |---|---|
