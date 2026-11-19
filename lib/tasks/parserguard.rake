@@ -55,3 +55,18 @@ namespace :parserguard do
     end
   end
 end
+
+namespace :parserguard do
+  desc "Detect drift for every non-baseline snapshot (or SNAPSHOT=id) against its baseline"
+  task detect: :environment do
+    scope = ENV["SNAPSHOT"] ? Snapshot.where(_id: ENV["SNAPSHOT"]) : Snapshot.where(baseline: false)
+    scope.light.order_by(captured_at: :asc).each do |snapshot|
+      result = Drift::Detector.call(Snapshot.find(snapshot.id))
+      next warn("skip #{snapshot.label}: #{result.error_message}") if result.failure?
+
+      e = result.value
+      fields = e.broken_fields.map { |f| f["field"] }.join(",")
+      puts format("%-24s score=%.3f %-7s broken=[%s]", snapshot.label, e.drift_score, e.severity, fields)
+    end
+  end
+end
