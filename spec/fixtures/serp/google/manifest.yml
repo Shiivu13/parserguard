@@ -1,0 +1,38 @@
+# Regression expectations for hand-written Google-like SERP fixtures.
+# Order matters: the first entry becomes the target's baseline on import.
+# Ranges are inclusive [min, max].
+fixtures:
+  - file: baseline.html
+    query: ruby web scraping
+    description: Reference layout the contracts were written against.
+    expect:
+      organic_results_rate: [0.95, 1.0]
+      drift_score: [0.0, 0.0]
+      severity: none
+
+  - file: class_rename.html
+    query: ruby web scraping
+    description: Same DOM tree, obfuscated class names rotated.
+    expect:
+      organic_results_rate: [0.0, 0.89]
+      drift_score: [0.05, 0.6]
+      severity: [minor, major]
+      healed_rate_min: 0.9
+
+  - file: structural_change.html
+    query: ruby web scraping
+    description: Container class renamed, extra wrappers, cite moved inside link.
+    expect:
+      organic_results_rate: [0.0, 0.5]
+      drift_score: [0.2, 1.0]
+      severity: [major, broken]
+      healed_rate_min: 0.9
+
+  - file: broken.html
+    query: ruby web scraping
+    description: Consent interstitial, no results at all.
+    expect:
+      organic_results_rate: [0.0, 0.0]
+      drift_score: [0.5, 1.0]
+      severity: broken
+      max_candidate_confidence: 0.6
