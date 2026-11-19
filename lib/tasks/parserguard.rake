@@ -35,3 +35,23 @@ namespace :parserguard do
     puts "#{created.meta[:duplicate] ? 'dup' : 'new'} #{created.value.label}"
   end
 end
+
+namespace :parserguard do
+  desc "Load config/contracts/*.yml (FORCE=1 overwrites existing contracts)"
+  task load_contracts: :environment do
+    Contracts::Loader.call(force: ENV["FORCE"].present?).each do |r|
+      puts r.ok? ? "#{r.meta[:action]} #{r.value.key} v#{r.value.version}" : "FAIL #{r.meta[:file]}: #{r.error_message}"
+    end
+  end
+
+  desc "Run active contracts on the latest snapshot of each engine (SNAPSHOT=id to pick one)"
+  task run: :environment do
+    ParserContract.active.each do |contract|
+      snapshot = ENV["SNAPSHOT"] ? Snapshot.find(ENV["SNAPSHOT"]) : Snapshot.where(engine: contract.engine).recent.first
+      next puts("skip #{contract.key}: no snapshots") unless snapshot
+
+      run = Contracts::Runner.call(contract, snapshot)
+      puts format("%-28s %-28s %-6s rate=%.2f containers=%d", contract.key, snapshot.label, run.status, run.extraction_rate, run.container_count)
+    end
+  end
+end
