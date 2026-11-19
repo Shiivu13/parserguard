@@ -4,8 +4,8 @@ ENV["RAILS_ENV"] ||= "test"
 if ENV["COVERAGE"] != "false"
   require "simplecov"
   SimpleCov.start "rails" do
-    add_group "Services", "app/services"
-    add_filter "/spec/"
+    group "Services", "app/services"
+    skip "/spec/"
   end
 end
 
@@ -25,5 +25,5 @@ RSpec.configure do |config|
   config.include ActiveJob::TestHelper
 
   config.before(:suite) { Mongoid::Tasks::Database.create_indexes }
-  config.before(:each) { Mongoid.purge! }
+  config.before(:each) { Mongoid.truncate! }
 end

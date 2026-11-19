@@ -20,6 +20,8 @@ gem "mongoid", "~> 9.0", ">= 9.0.3"
 gem "nokogiri", ">= 1.16"
 gem "faraday", "~> 2.12"
 gem "faraday-follow_redirects"
+# json 3.x removed options ActiveSupport 8.0 still passes (quirks_mode).
+gem "json", "~> 2.10"
 
 # Background jobs
 gem "sidekiq", "~> 7.3"
