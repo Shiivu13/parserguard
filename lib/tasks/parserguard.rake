@@ -95,3 +95,24 @@ namespace :parserguard do
     puts token
   end
 end
+
+namespace :parserguard do
+  desc "Demo: load contracts, import fixtures, detect drift and heal synchronously"
+  task demo: :environment do
+    Contracts::Loader.call
+    Ingestion::FixtureImporter.call(dir: Rails.root.join("spec/fixtures/serp/google"))
+    Snapshot.where(baseline: false).order_by(captured_at: :asc).each do |snapshot|
+      result = Drift::Detector.call(snapshot)
+      next unless result.ok? && result.meta[:created]
+
+      event = result.value
+      event.broken_fields.each do |f|
+        contract = ParserContract.find(f["contract_id"])
+        Healing::Healer.call(contract:, field_name: f["field"], snapshot:, drift_event: event)
+      end
+      puts format("%-26s %-7s score=%.3f broken=%s", snapshot.label, event.severity, event.drift_score,
+                  event.broken_fields.map { |f| f["field"] }.join(","))
+    end
+    puts "Open http://localhost:3000 to review #{SelectorSuggestion.pending.count} pending suggestions."
+  end
+end

@@ -14,7 +14,7 @@ class RunContractsJob < ApplicationJob
 
     failing = run.container_count.zero? ? [ ParserContract::CONTAINER_FIELD ] : run.failing_fields(contract.min_extraction_rate)
     failing.each do |field|
-      next if SelectorSuggestion.pending.where(contract_id: contract.id, field_name: field).exists?
+      next if SelectorSuggestion.pending.where(contract_id: contract.id, field_name: field, snapshot_id: snapshot.id).exists?
 
       HealFieldJob.perform_later(contract.id.to_s, field, snapshot.id.to_s)
     end

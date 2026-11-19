@@ -1,0 +1,40 @@
+<% content_for :title, @snapshot.label %>
+
+<div class="title-row">
+  <h1><%= @snapshot.label %> <%= tag.span("baseline", class: "badge badge-none") if @snapshot.baseline %></h1>
+  <% unless @snapshot.baseline %>
+    <%= button_to "Make baseline", promote_snapshot_path(@snapshot), class: "btn",
+                  form: { data: { turbo_confirm: "Future drift will be measured against this snapshot. Continue?" } } %>
+  <% end %>
+</div>
+
+<dl class="kv">
+  <dt>Query</dt><dd><%= @snapshot.query.presence || "—" %></dd>
+  <dt>Source</dt><dd><%= @snapshot.source %> <span class="muted"><%= @snapshot.source_ref %></span></dd>
+  <dt>Captured</dt><dd><%= ago(@snapshot.captured_at) %></dd>
+  <dt>Size</dt><dd><%= number_to_human_size(@snapshot.byte_size) %></dd>
+  <dt>SHA-256</dt><dd><code class="hash"><%= @snapshot.sha256 %></code></dd>
+  <dt>Drift</dt><dd><%= @event ? link_to("#{@event.severity} (#{score(@event.drift_score)})", drift_event_path(@event)) : "—" %></dd>
+</dl>
+
+<h2>Contract runs</h2>
+<% if @runs.empty? %>
+  <p class="empty">No runs on this snapshot.</p>
+<% else %>
+  <ul class="pill-list">
+    <% @runs.each do |r| %>
+      <li><%= link_to r.contract.key, contract_path(r.contract_id) %> v<%= r.contract_version %>
+        <%= status_badge(r.status) %> <%= pct(r.extraction_rate) %></li>
+    <% end %>
+  </ul>
+<% end %>
+
+<section data-controller="preview-toggle">
+  <h2>
+    HTML source
+    <button type="button" class="btn btn-quiet btn-small" data-action="preview-toggle#toggle"
+            data-preview-toggle-target="button" aria-expanded="false">Show</button>
+  </h2>
+  <%# Rendered as escaped text only: captured pages are untrusted. %>
+  <pre class="source" data-preview-toggle-target="panel" hidden><%= @snapshot.html.to_s.first(200_000) %></pre>
+</section>

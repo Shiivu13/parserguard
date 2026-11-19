@@ -1,7 +1,7 @@
 module Healing
   # Applies a suggestion to its contract: swaps the selector, bumps the
   # contract version, records a revision, and rejects sibling suggestions
-  # for the same field so the dashboard shows one decision per field.
+  # for the same field and snapshot so each layout gets one decision per field.
   class SuggestionAcceptor
     def self.call(suggestion, selector: nil) = new(suggestion, selector).call
 
@@ -29,7 +29,7 @@ module Healing
 
       @suggestion.update!(status: "accepted", accepted_selector: @selector, accepted_at: Time.current)
       SelectorSuggestion.pending
-                        .where(contract_id: contract.id, field_name: @suggestion.field_name)
+                        .where(contract_id: contract.id, field_name: @suggestion.field_name, snapshot_id: @suggestion.snapshot_id)
                         .not.where(_id: @suggestion.id)
                         .update_all(status: "rejected")
       Result.success(contract)

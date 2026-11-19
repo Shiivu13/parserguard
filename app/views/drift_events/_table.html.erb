@@ -1,0 +1,21 @@
+<% if events.empty? %>
+  <p class="empty">No drift detected yet.</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Target</th><th>Severity</th><th>Score</th><th>Broken fields</th><th></th></tr></thead>
+      <tbody>
+        <% events.each do |e| %>
+          <tr data-severity="<%= e.severity %>" data-timeline-filter-target="row">
+            <td><%= ago(e.created_at) %></td>
+            <td><%= target_label(e.engine, e.locale, e.device) %></td>
+            <td><%= severity_badge(e.severity) %></td>
+            <td><%= meter(e.drift_score, label: score(e.drift_score), invert: true) %> <%= score(e.drift_score) %></td>
+            <td><%= e.broken_fields.map { |f| f["field"] }.join(", ").presence || "—" %></td>
+            <td><%= link_to "Details", drift_event_path(e) %><%= " · ack" if e.acknowledged_at %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

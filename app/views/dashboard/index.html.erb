@@ -1,0 +1,55 @@
+<% content_for :title, "Overview" %>
+
+<section class="stats">
+  <div class="stat"><span class="stat-label">Targets</span><span class="stat-value"><%= @targets.size %></span></div>
+  <div class="stat"><span class="stat-label">Contracts</span><span class="stat-value"><%= @contracts.size %></span></div>
+  <div class="stat <%= 'stat-alert' if @open_events.positive? %>">
+    <span class="stat-label">Open major/broken drift</span><span class="stat-value"><%= @open_events %></span>
+  </div>
+  <div class="stat"><span class="stat-label">Pending suggestions</span>
+    <span class="stat-value"><%= link_to @pending_suggestions, suggestions_path %></span></div>
+</section>
+
+<h2>Engine health</h2>
+<% if @targets.empty? %>
+  <p class="empty">No snapshots yet. Run <code>bin/rails parserguard:ingest_fixtures</code> or POST to <code>/api/v1/snapshots</code>.</p>
+<% else %>
+  <div class="cards">
+    <% @targets.each do |t| %>
+      <article class="card">
+        <header class="card-head">
+          <h3><%= target_label(t.engine, t.locale, t.device) %></h3>
+          <%= severity_badge(t.latest_event&.severity || "none") %>
+        </header>
+        <dl class="kv">
+          <dt>Snapshots</dt><dd><%= t.snapshot_count %></dd>
+          <dt>Last capture</dt><dd><%= ago(t.last_captured_at) %></dd>
+          <dt>Baseline</dt><dd><%= t.baseline ? link_to("v#{t.baseline.version}", snapshot_path(t.baseline)) : "—" %></dd>
+          <dt>Latest drift</dt>
+          <dd><%= t.latest_event ? link_to(score(t.latest_event.drift_score), drift_event_path(t.latest_event)) : "—" %></dd>
+        </dl>
+      </article>
+    <% end %>
+  </div>
+<% end %>
+
+<h2>Contracts</h2>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Contract</th><th>Version</th><th>Last run</th><th>Extraction</th><th>Status</th></tr></thead>
+    <tbody>
+      <% @contracts.each do |c| run = @latest_runs[c.id] %>
+        <tr>
+          <td><%= link_to c.key, contract_path(c) %></td>
+          <td>v<%= c.version %></td>
+          <td><%= run ? ago(run.created_at) : "never" %></td>
+          <td><%= run ? safe_join([ meter(run.extraction_rate), " ", pct(run.extraction_rate) ]) : "—" %></td>
+          <td><%= run ? status_badge(run.status) : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Recent drift</h2>
+<%= render "drift_events/table", events: @recent_events %>

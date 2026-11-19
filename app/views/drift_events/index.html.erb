@@ -1,0 +1,18 @@
+<% content_for :title, "Drift timeline" %>
+<h1>Drift timeline</h1>
+
+<div data-controller="timeline-filter">
+  <fieldset class="filters">
+    <legend>Show severities</legend>
+    <% DriftEvent::SEVERITIES.each do |sev| %>
+      <label>
+        <input type="checkbox" value="<%= sev %>" checked
+               data-timeline-filter-target="toggle" data-action="timeline-filter#apply">
+        <%= severity_badge(sev) %>
+      </label>
+    <% end %>
+    <span class="muted" data-timeline-filter-target="count"></span>
+  </fieldset>
+
+  <%= render "drift_events/table", events: @events %>
+</div>

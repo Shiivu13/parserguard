@@ -47,8 +47,9 @@ RSpec.describe RunContractsJob do
     expect(HealFieldJob).to have_been_enqueued.with(contract.id.to_s, "link", snaps["structural_change"].id.to_s)
   end
 
-  it "does not re-heal a field that already has a pending suggestion" do
-    create(:selector_suggestion, contract:, field_name: "title")
+  it "does not re-heal a field that already has a pending suggestion for this snapshot" do
+    create(:selector_suggestion, contract:, field_name: "title", snapshot: snaps["class_rename"])
+    create(:selector_suggestion, contract:, field_name: "link", snapshot: snaps["structural_change"])
     described_class.perform_now(contract.id.to_s, snaps["class_rename"].id.to_s)
     heal_fields = enqueued_jobs.select { |j| j["job_class"] == "HealFieldJob" }.map { |j| j["arguments"][1] }
     expect(heal_fields).to match_array(%w[link snippet])

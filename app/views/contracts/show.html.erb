@@ -1,0 +1,76 @@
+<% content_for :title, @contract.key %>
+<h1><code><%= @contract.key %></code> <span class="muted">v<%= @contract.version %></span></h1>
+
+<dl class="kv">
+  <dt>Scope</dt><dd><code><%= @contract.scope_selector %></code></dd>
+  <dt>Container</dt><dd><code><%= @contract.container_selector %></code></dd>
+  <dt>Min extraction rate</dt><dd><%= pct(@contract.min_extraction_rate) %></dd>
+</dl>
+
+<h2>Fields</h2>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Name</th><th>Selector</th><th>Extract</th><th>Type</th><th>Required</th><th>Last rate</th></tr></thead>
+    <tbody>
+      <% last = @runs.first %>
+      <% @contract.field_specs.each do |f| %>
+        <tr>
+          <td><%= f.name %></td>
+          <td><code><%= f.selector %></code></td>
+          <td><%= f.extract %></td>
+          <td><%= f.value_type %></td>
+          <td><%= f.required ? "yes" : "no" %></td>
+          <td><%= last ? safe_join([ meter(last.field_rate(f.name)), " ", pct(last.field_rate(f.name)) ]) : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Recent runs</h2>
+<% if @runs.empty? %>
+  <p class="empty">Never run.</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Snapshot</th><th>Contract v</th><th>Containers</th><th>Rate</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% @runs.each do |r| %>
+          <tr>
+            <td><%= ago(r.created_at) %></td>
+            <td><%= link_to "snapshot", snapshot_path(r.snapshot_id) %></td>
+            <td>v<%= r.contract_version %></td>
+            <td><%= r.container_count %></td>
+            <td><%= meter(r.extraction_rate) %> <%= pct(r.extraction_rate) %></td>
+            <td><%= status_badge(r.status) %></td>
+            <td><%= button_to "Re-run", run_contract_path(@contract, snapshot_id: r.snapshot_id), class: "btn btn-quiet btn-small" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<h2>Revision history</h2>
+<% if @contract.revisions.empty? %>
+  <p class="empty">No selector changes yet.</p>
+<% else %>
+  <ol class="revisions">
+    <% @contract.revisions.reverse_each do |rev| %>
+      <li>v<%= rev.version %> · <strong><%= rev.field_name %></strong>:
+        <code class="old"><%= rev.from_selector %></code> → <code><%= rev.to_selector %></code>
+        <span class="muted"><%= ago(rev.at) %></span></li>
+    <% end %>
+  </ol>
+<% end %>
+
+<h2>Suggestions</h2>
+<% if @suggestions.empty? %>
+  <p class="empty">None.</p>
+<% else %>
+  <ul class="pill-list">
+    <% @suggestions.each do |s| %>
+      <li><%= link_to s.field_name, suggestion_path(s) %> <%= status_badge(s.status) %></li>
+    <% end %>
+  </ul>
+<% end %>
