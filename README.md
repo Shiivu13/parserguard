@@ -1,10 +1,10 @@
 # ParserGuard
 
-**Detects when search-engine result pages change layout, tells you which parser fields broke, and suggests replacement CSS selectors.**
+ParserGuard notices when a search results page changes its HTML, tells you which parser fields stopped extracting, and suggests CSS selectors to replace the broken ones.
 
-Scraping APIs live and die by parsers that read someone else's HTML. When Google renames `yuRUbf` to `kb0PBd`, extraction drops to zero and customers notice before you do. ParserGuard watches captured SERP HTML, measures structural drift against a known-good baseline, runs your parser contracts, and when a field breaks it finds where the old values moved and proposes ranked selectors for a human to accept.
+Any scraper that reads Google results depends on class names it doesn't control. When `yuRUbf` becomes `kb0PBd` overnight, extraction drops to zero, and usually a customer reports it first. ParserGuard compares each new capture of a results page with a known-good baseline, runs your parser contracts against it, and when a field breaks, finds where the old values went in the new page and ranks selectors that would pick them up again. A person reviews the suggestions and accepts one; nothing changes on its own.
 
-Built with Ruby 3.3, Rails 8, MongoDB (Mongoid 9), Sidekiq, Nokogiri, Stimulus.
+Stack: Ruby 3.3, Rails 8, MongoDB with Mongoid 9, Sidekiq, Nokogiri, Stimulus.
 
 ```
 $ bin/rails parserguard:demo
@@ -34,51 +34,57 @@ flowchart LR
   H --> I[RunContractsJob<br/>re-run, heal what still fails]
 ```
 
-1. **Contracts** (`config/contracts/*.yml`): a container selector plus per-field selectors, required flags and types (`string`, `url`, `integer`). Extraction rate = valid required cells / (containers × required fields).
-2. **Drift**: every snapshot stores histograms of root-to-node tag paths (`div>div>a>h3`) and class paths (`div.g>div.yuRUbf>a>h3.LC20lb`). Drift = 0.6 × tag drift + 0.4 × class drift, each `1 − weighted Jaccard`. Severity also reflects whether contracts still pass, so an ad block above the results is `minor`, not a page.
-3. **Healing**: take known-good values from the baseline's last passing run, find them in the new DOM (exact, then banded Levenshtein ≥ 0.85; URLs by host+path), generate selectors from those nodes (ids, ARIA/data attributes, semantic tags, readable vs build-generated classes, short chains, `nth-of-type`), and score each across the whole page:
+A contract (`config/contracts/*.yml`) says what to extract: a container selector for each result, and inside it a selector, a required flag and a type (`string`, `url` or `integer`) for each field. The extraction rate is the share of required cells that come out valid, i.e. valid required cells / (containers × required fields).
 
-   `confidence = 0.4·coverage + 0.3·agreement + 0.2·stability + 0.1·uniqueness`
+Every snapshot stores two histograms of root-to-node paths, one with tags only (`div>div>a>h3`) and one with classes (`div.g>div.yuRUbf>a>h3.LC20lb`). Drift is `0.6 × tag drift + 0.4 × class drift`, where each part is `1 − weighted Jaccard` against the baseline. Severity also looks at whether the contracts still pass. An ad block inserted above the results changes the structure, but as long as every field still extracts, it is logged as `minor` and nobody gets paged.
 
-   If the container itself is gone, it climbs from the matched values to the item boundary and scores container candidates by the extraction rate the contract would get. Suggestions are **never auto-applied**.
+When a field breaks, the healer takes the values the field returned on the baseline and looks for them in the new page: exact text first, then banded Levenshtein at 0.85 similarity or higher, and host plus path for URLs. From each node it finds, it builds candidate selectors (ids, ARIA and data attributes, semantic tags, readable classes ranked above build-generated ones, short parent chains, `nth-of-type`) and scores every candidate across the whole page:
 
-Details and formulas: [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
+```
+confidence = 0.4·coverage + 0.3·agreement + 0.2·stability + 0.1·uniqueness
+```
 
-## Quick start (Windows)
+If the container selector itself matches nothing, the healer climbs from the found values to the boundary of each result item and scores container candidates by the extraction rate the contract would get with them. The full formulas are in [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
 
-Prerequisites: Ruby 3.3 (RubyInstaller + DevKit), MongoDB 7+ running on `localhost:27017`. Redis is only needed for Sidekiq.
+## Running it locally
+
+You need Ruby 3.3 (on Windows, RubyInstaller with the DevKit) and MongoDB 7 or newer on `localhost:27017`. Redis is only needed if you want Sidekiq.
 
 ```powershell
-cd parser_guard
+git clone https://github.com/Shiivu13/parserguard.git
+cd parserguard
 bundle install
-$env:JOB_ADAPTER = "async"          # in-process jobs, no Redis needed
+$env:JOB_ADAPTER = "async"          # run jobs in-process, no Redis
 bin/rails db:mongoid:create_indexes
-bin/rails parserguard:demo          # loads contracts, imports fixtures, detects, heals
+bin/rails parserguard:demo          # loads contracts, imports fixtures, detects drift, heals
 bin/rails server                    # http://localhost:3000
 ```
 
-macOS/Linux: `docker compose up -d` starts MongoDB and Redis, then the same commands (drop `JOB_ADAPTER` to use Sidekiq: `bundle exec sidekiq`).
+On macOS or Linux, `docker compose up -d` starts MongoDB and Redis. The commands are the same; leave out `JOB_ADAPTER` and start `bundle exec sidekiq` to use Sidekiq. Sidekiq doesn't run natively on Windows, so there use `JOB_ADAPTER=async`, WSL or Docker.
 
-Environment (see `.env.example`):
+Configuration comes from environment variables (`.env.example` has all of them):
 
 | Variable | Purpose |
 |---|---|
-| `MONGODB_URI` | Mongo connection (default local) |
-| `REDIS_URL`, `JOB_ADAPTER` | Sidekiq, or `async` for dev without Redis |
-| `SERPAPI_KEY` | optional: real SERP HTML via SerpApi `raw_html_file` |
-| `PARSERGUARD_WEBHOOK_URL` | optional: Slack-compatible alert webhook |
-| `DASHBOARD_PASSWORD` | required outside development/test |
+| `MONGODB_URI` | Mongo connection, defaults to local |
+| `REDIS_URL`, `JOB_ADAPTER` | Sidekiq, or `async` for development without Redis |
+| `SERPAPI_KEY` | optional, fetch real result pages through SerpApi's `raw_html_file` |
+| `PARSERGUARD_WEBHOOK_URL` | optional, Slack-compatible webhook for alerts |
+| `DASHBOARD_PASSWORD` | required outside development and test |
 
 ## Dashboard
 
-- **Overview**: health card per engine/locale/device, latest contract runs, recent drift.
-- **Drift timeline**: severity filter, per-event added/removed class paths, broken fields.
-- **Suggestion review**: baseline values on the left, each candidate's coverage/agreement/stability/uniqueness and sample values on the right; Accept applies it, bumps the contract version and queues a re-run, which heals the next broken field (container first, then fields inside it).
-- **Contracts**: field rates, run history, revision history (`div.g → div.MjjYud`).
+The overview starts with the suggestions waiting for a decision. Below them is a card per engine, locale and device, with the latest drift score and a small chart of recent scores.
+
+The drift timeline lists every comparison and can be filtered by severity. Each drift event shows which fields broke and which class paths appeared or disappeared.
+
+A suggestion page puts what the old selector extracted on the baseline next to each candidate's scores and sample values. Accepting a candidate updates the contract, bumps its version and re-runs it on that snapshot. Anything that still fails gets its own suggestion, so a structural change is fixed in steps: the container first, then the fields inside it.
+
+Each contract page has its field rates, recent runs and the history of selector changes (for example `div.g → div.MjjYud`).
 
 ## API
 
-Create a key once (the raw token is shown only now; only its SHA-256 is stored):
+Create a key first. The token is printed once, and only its SHA-256 hash is stored.
 
 ```powershell
 bin/rails parserguard:api_key NAME=ci
@@ -98,44 +104,52 @@ curl -H "$H" -X POST localhost:3000/api/v1/suggestions/<id>/accept
 | GET/POST/PATCH | `/api/v1/contracts` | PATCH validates before writing; selector changes bump `version` |
 | POST | `/api/v1/contracts/:id/runs` | `snapshot_id` |
 | POST | `/api/v1/contracts/:id/heal` | `field` (or `_container`), `snapshot_id` |
-| GET | `/api/v1/runs`, `/api/v1/drift_events` | filters, `page`/`per` (≤100) |
+| GET | `/api/v1/runs`, `/api/v1/drift_events` | filters, `page`/`per` (max 100) |
 | POST | `/api/v1/suggestions/:id/accept` / `reject` | 409 if already decided |
 
-Errors are always `{"error":{"code","message"}}`.
+Errors always have the shape `{"error":{"code","message"}}`.
 
 ## Rake tasks
 
 | Task | What it does |
 |---|---|
-| `parserguard:demo` | Full pipeline on the bundled fixtures |
-| `parserguard:ingest_fixtures DIR=...` | Import a fixture directory (manifest order) |
-| `parserguard:fetch URL=... \| QUERY=...` | One snapshot from a URL or SerpApi |
-| `parserguard:load_contracts [FORCE=1]` | Load YAML contracts (never overwrites healed ones without FORCE) |
-| `parserguard:run`, `parserguard:detect`, `parserguard:heal` | Run contracts / detect drift / suggest selectors |
-| `parserguard:regression` | Manifest-driven regression suite in a scratch DB; exits 1 on failure (CI) |
+| `parserguard:demo` | Runs the whole pipeline on the bundled fixtures |
+| `parserguard:ingest_fixtures DIR=...` | Imports a fixture directory in manifest order |
+| `parserguard:fetch URL=... \| QUERY=...` | Captures one snapshot from a URL or a SerpApi search |
+| `parserguard:load_contracts [FORCE=1]` | Loads the YAML contracts; without FORCE it leaves existing (possibly healed) contracts alone |
+| `parserguard:run`, `parserguard:detect`, `parserguard:heal` | Runs contracts, detects drift, suggests selectors |
+| `parserguard:regression` | Runs the fixture manifest in a scratch database and exits 1 on any failure; CI uses it |
 
-## Testing
+## Tests
 
 ```powershell
-bundle exec rspec                      # 203 examples, ~97% line coverage
+bundle exec rspec                      # 203 examples, about 97% line coverage
 bin/rails parserguard:regression       # 18 fixture expectations
 bin/rubocop
 ```
 
-Each test process uses its own MongoDB database (dropped afterwards), so parallel runs don't interfere. Fixtures in `spec/fixtures/serp/google/` cover: baseline, ads block added (minor), obfuscated classes rotated, structural change (container gone), consent interstitial (broken). Expectations live in `manifest.yml` and drive both the spec and the rake task.
+Each test process gets its own MongoDB database and drops it at the end, so parallel runs don't wipe each other's data.
 
-## Security notes
+The fixtures in `spec/fixtures/serp/google/` are hand-written pages:
+- the baseline
+- the same page with an ad block added
+- rotated obfuscated class names
+- a structural change that removes the old container
+- a consent interstitial with no results
 
-Captured pages and URLs are untrusted input. Measures in place:
+`manifest.yml` holds the expected rate, drift score, severity and healing result for each one. The regression spec and the rake task both read it.
 
-- **SSRF**: http/https only. Every address the host resolves to must be public, and the IPv6 forms that reach IPv4 or internal space are blocked. The connection is pinned to the vetted IP, so DNS rebinding can't swap the address. Each redirect hop is re-checked.
-- **Response limits**: streamed byte cap, identity encoding (no gzip bombs), total deadline.
-- **Healing**: banded Levenshtein with work budgets; parse depth capped at 128.
-- **Selectors**: a policy rejects universal-descendant chains, nested `:has`, and over-long selectors.
-- **Rendering**: everything is escaped and CSP uses script nonces. Slack mrkdwn is escaped.
-- **Auth**: API keys are stored hashed. Dashboard basic auth fails closed outside dev/test.
+## Security
 
-What was found and fixed during hardening: [docs/HARDENING.md](docs/HARDENING.md).
+Captured pages and submitted URLs are treated as untrusted.
+
+URL fetching only allows http and https. Every address a host resolves to must be public, and the IPv6 forms that lead to IPv4 or internal space are blocked. The connection goes to the IP that was checked, so DNS rebinding can't swap it, and every redirect is checked again. Responses are streamed with a byte cap, requested without compression to rule out gzip bombs, and limited by a total deadline.
+
+Healing uses banded Levenshtein with limits on how much work one page can cause. Parsing stops at a depth of 128. User-supplied selectors can't use universal descendant chains, nested `:has` or very long expressions.
+
+Everything rendered in the dashboard is escaped, and the CSP only allows scripts with a per-request nonce. Slack messages are escaped too. API keys are stored hashed, and the dashboard refuses to run outside development and test without a password.
+
+[docs/HARDENING.md](docs/HARDENING.md) lists the problems found and fixed while hardening the app.
 
 ## Project layout
 
@@ -153,6 +167,6 @@ docs/                    plan, algorithms, hardening notes
 
 ## Known limitations
 
-- Container healing needs at least two matched results; a page with exactly one result yields no container suggestion.
-- Drift histograms cover the whole `<body>`; very dynamic pages may need a narrower scope per engine.
-- Sidekiq does not support Windows natively. On Windows use `JOB_ADAPTER=async`, or run Sidekiq under WSL or Docker.
+Container healing needs at least two matched results, so a page with exactly one result gets no container suggestion.
+
+Drift histograms cover the whole `<body>`. Pages with a lot of dynamic content outside the results may need a narrower scope per engine.
