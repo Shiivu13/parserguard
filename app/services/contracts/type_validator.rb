@@ -23,9 +23,13 @@ module Contracts
       [ text.present?, text.presence ]
     end
 
+    # First number in the text: "About 1,230 results (0.45 seconds)" -> 1230.
+    # Decimals ("4.5") are not integers.
     def integer(value)
-      digits = value.to_s.gsub(/\D/, "")
-      digits.empty? ? [ false, nil ] : [ true, digits.to_i ]
+      match = value.to_s.match(/(?<![\d.])(-?\d{1,3}(?:[,\u00a0 ]\d{3})+|-?\d+)(\.\d+)?/)
+      return [ false, nil ] if match.nil? || match[2]
+
+      [ true, match[1].gsub(/[,\u00a0 ]/, "").to_i ]
     end
 
     def url(value, base_url)
@@ -33,8 +37,8 @@ module Contracts
       return [ false, nil ] if raw.empty?
 
       uri = URI.join(base_url, raw)
-      # Google wraps outbound links as /url?q=<target>&sa=...
-      if uri.path == "/url" && uri.query
+      # Google wraps outbound links as /url?q=<target>&sa=... (only unwrap Google's own).
+      if uri.path == "/url" && uri.query && google_host?(uri.host, raw)
         target = URI.decode_www_form(uri.query).to_h["q"]
         uri = URI.parse(target) if target
       end
@@ -42,6 +46,10 @@ module Contracts
       [ ok, ok ? uri.to_s : nil ]
     rescue URI::Error, ArgumentError
       [ false, nil ]
+    end
+
+    def google_host?(host, raw)
+      raw.start_with?("/") || host.to_s.match?(/(\A|\.)google\.[a-z.]+\z/)
     end
   end
 end

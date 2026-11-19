@@ -50,7 +50,7 @@ module Healing
     end
 
     # Deepest element under `roots` whose text (or href) best matches `value`.
-    def find(roots, value, url: false, min_similarity: 0.85, max_length: 300, max_nodes: MAX_NODES, max_fuzzy: MAX_FUZZY)
+    def find(roots, value, url: false, attr: "href", min_similarity: 0.85, max_length: 300, max_nodes: MAX_NODES, max_fuzzy: MAX_FUZZY)
       target = url ? url_key(value) : normalize(value)
       return nil if target.blank?
 
@@ -62,7 +62,7 @@ module Healing
           next unless node.element?
           break if (state[:nodes] += 1) > max_nodes
 
-          score = url ? url_score(node, target) : text_score(node, target, state, min_similarity, max_length, max_fuzzy)
+          score = url ? url_score(node, target, attr) : text_score(node, target, state, min_similarity, max_length, max_fuzzy)
           next unless score >= (url ? 1.0 : min_similarity) && score > state[:score]
 
           state[:best] = node
@@ -95,9 +95,9 @@ module Healing
       (target_tokens & candidate.split.to_set).size.to_f / target_tokens.size
     end
 
-    def url_score(node, target)
-      href = node["href"]
-      href && url_key(href) == target ? 1.0 : 0.0
+    def url_score(node, target, attr = "href")
+      value = node[attr.presence || "href"]
+      value && url_key(value) == target ? 1.0 : 0.0
     end
 
     # Banded Levenshtein (Ukkonen): only cells with |i - j| <= max are filled,

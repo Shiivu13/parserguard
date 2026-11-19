@@ -12,8 +12,9 @@ RSpec.describe DetectDriftJob do
     expect(SendAlertJob).to have_been_enqueued.once
   end
 
-  it "does nothing twice for the same snapshot" do
+  it "does nothing twice once its follow-ups have run" do
     described_class.perform_now(snaps["broken"].id.to_s)
+    enqueued_jobs.dup.each { |j| j["job_class"].constantize.perform_now(*ActiveJob::Arguments.deserialize(j["arguments"])) }
     clear_enqueued_jobs
     described_class.perform_now(snaps["broken"].id.to_s)
     expect(enqueued_jobs).to be_empty

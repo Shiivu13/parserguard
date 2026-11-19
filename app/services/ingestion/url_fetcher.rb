@@ -59,7 +59,7 @@ module Ingestion
         kind, value = fetch(uri, ip)
         case kind
         when :redirect then current = URI.join(uri, value).to_s
-        when :ok then return Result.success(value, final_url: uri.to_s)
+        when :ok then return Result.success(value, final_url: uri.to_s, charset: @charset)
         else return Result.failure(value)
         end
       end
@@ -114,6 +114,7 @@ module Ingestion
           return [ :redirect, response["location"] ] if response.is_a?(Net::HTTPRedirection) && response["location"]
           return [ :error, "HTTP #{response.code}" ] unless response.is_a?(Net::HTTPSuccess)
 
+          @charset = response.type_params["charset"]
           declared = response["content-length"]&.to_i
           raise TooLarge if declared && declared > @max_bytes
 
@@ -129,7 +130,7 @@ module Ingestion
         raise TooLarge if body.bytesize > @max_bytes
         raise DeadlineExceeded if now > @deadline
       end
-      body.force_encoding(Encoding::UTF_8)
+      body
     end
   end
 end

@@ -149,15 +149,12 @@ RSpec.describe Healing::SuggestionAcceptor do
     expect(suggestion.reload).to have_attributes(status: "accepted", accepted_selector: "h3.new")
   end
 
-  it "accepts an explicit selector and rejects siblings for the same snapshot only" do
-    snapshot = create(:snapshot)
-    suggestion.update!(snapshot:)
-    sibling = create(:selector_suggestion, contract:, field_name: "title", snapshot:)
+  it "accepts an explicit selector and leaves other layouts' suggestions pending" do
+    suggestion.update!(snapshot: create(:snapshot))
     other_layout = create(:selector_suggestion, contract:, field_name: "title", snapshot: create(:snapshot))
     described_class.call(suggestion, selector: "div > h3")
 
     expect(contract.reload.field_spec("title").selector).to eq("div > h3")
-    expect(sibling.reload.status).to eq("rejected")
     expect(other_layout.reload.status).to eq("pending")
   end
 

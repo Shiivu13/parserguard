@@ -11,7 +11,7 @@ module Html
     def self.call(html) = new(html).call
 
     def initialize(html)
-      @html = html.to_s.dup.force_encoding(Encoding::UTF_8).scrub("")
+      @html = html.to_s.dup.force_encoding(::Encoding::UTF_8).scrub("\uFFFD")
     end
 
     def call

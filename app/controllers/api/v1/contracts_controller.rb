@@ -22,17 +22,23 @@ module Api
       end
 
       # Selector edits bump the version so runs stay attributable to a contract revision.
+      # Validated before anything is written; concurrent edits retry on version.
       def update
         contract = find!(ParserContract, params[:id])
-        before = selector_snapshot(contract)
-        contract.assign_attributes(contract_params.except(:engine, :result_type))
-        contract.field_specs = field_specs_param if params.key?(:fields)
-        contract.version += 1 if selector_snapshot(contract) != before
+        scalars = contract_params.except(:engine, :result_type).to_h
+        specs = field_specs_param.map(&:as_document) if params.key?(:fields)
 
-        if contract.save
-          render json: { data: ApiSerializer.contract(contract) }
+        updated = ParserContract.change!(contract.id) do |doc|
+          before = selector_snapshot(doc)
+          scalars.each { |name, value| doc[name] = ParserContract.fields[name].mongoize(value) }
+          doc["field_specs"] = specs if specs
+          { bump: selector_snapshot(doc) != before }
+        end
+
+        if updated.errors.empty?
+          render json: { data: ApiSerializer.contract(updated) }
         else
-          render_error(:unprocessable_entity, "invalid_contract", contract.errors.full_messages.to_sentence)
+          render_error(:unprocessable_entity, "invalid_contract", updated.errors.full_messages.to_sentence)
         end
       end
 
@@ -58,8 +64,8 @@ module Api
         end
       end
 
-      def selector_snapshot(contract)
-        [ contract.scope_selector, contract.container_selector, contract.field_specs.map { |f| [ f.name, f.selector, f.extract ] } ]
+      def selector_snapshot(doc)
+        [ doc["scope_selector"], doc["container_selector"], Array(doc["field_specs"]).map { |f| f.values_at("name", "selector", "extract") } ]
       end
     end
   end

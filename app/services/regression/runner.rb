@@ -34,6 +34,7 @@ module Regression
     def with_scratch_database
       name = "parserguard_regression_#{Process.pid}_#{SecureRandom.hex(3)}"
       Mongoid.override_database(name)
+      Rails.autoloaders.main.eager_load_dir(Rails.root.join("app/models")) # create_indexes only sees loaded models
       Mongoid::Tasks::Database.create_indexes
       yield
     ensure
