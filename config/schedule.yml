@@ -1,0 +1,6 @@
+# sidekiq-cron jobs (loaded by config/initializers/sidekiq.rb)
+scheduled_ingest:
+  cron: "0 */6 * * *"
+  class: ScheduledIngestJob
+  queue: default
+  active_job: true

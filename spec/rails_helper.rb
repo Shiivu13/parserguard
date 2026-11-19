@@ -25,5 +25,9 @@ RSpec.configure do |config|
   config.include ActiveJob::TestHelper
 
   config.before(:suite) { Mongoid::Tasks::Database.create_indexes }
-  config.before(:each) { Mongoid.truncate! }
+  config.before(:each) do
+    Mongoid.truncate!
+    clear_enqueued_jobs
+    clear_performed_jobs
+  end
 end
